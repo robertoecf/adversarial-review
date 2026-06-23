@@ -1,4 +1,4 @@
-# AGENTS.md — review agent guidelines (host-agnostic)
+# AGENTS.md: review agent guidelines (host-agnostic)
 
 ## Plugin architecture
 
@@ -18,16 +18,18 @@ For every review (plan, code, prompt, or routed-to via `review-all`):
 
 There is **no haiku courier subagent** in this version. The host (main
 session) does both the external dispatch and the synthesis. Removed in the
-0.5.0 refactor — the courier added complexity (model inconsistency across
+0.5.0 refactor: the courier added complexity (model inconsistency across
 files, blocking-vs-non-blocking ambiguity) without proportionate value.
 
 ## Cross-host routing
 
 | Detected host | Partner                              |
 |---------------|--------------------------------------|
-| `claude`      | Codex (`codex exec --sandbox read-only`) |
-| `codex`       | Claude (`claude -p --model opus --effort xhigh`) |
-| `unknown`     | (skip primary; try Gemini cascade)   |
+| `claude`      | Codex (`codex exec --sandbox read-only`), then Grok, then Pi/opencode-go, then Antigravity Gemini |
+| `codex`       | Claude (`claude -p --model opus --effort xhigh`), then Grok, then Pi/opencode-go, then Antigravity Gemini |
+| `grok`        | Codex, then Claude, then Pi/opencode-go, then Antigravity Gemini |
+| `pi`          | Codex, then Claude, then Grok, then Antigravity Gemini |
+| `unknown`     | Grok, then Pi/opencode-go, then Gemini via Antigravity |
 
 Detection happens at every invocation via `lib/detect-host.sh`. See
 `references/host-detection.md` for the priority order and the env-leak
@@ -44,25 +46,25 @@ partner ever re-triggers this skill, the guard fires. Never disable.
 
 Every finding in the final output MUST include:
 
-1. **Severity** — P0 (critical) / P1 (high) / P2 (medium) / P3 (low)
-2. **Evidence** — direct quote, file:line reference, or concrete scenario
-3. **Recommendation** — specific, actionable fix
-4. **Origin tag** — `[cross-validated]` / `[external-only]` / `[host-only]`
+1. **Severity**: P0 (critical) / P1 (high) / P2 (medium) / P3 (low)
+2. **Evidence**: direct quote, file:line reference, or concrete scenario
+3. **Recommendation**: specific, actionable fix
+4. **Origin tag**: `[cross-validated]` / `[external-only]` / `[host-only]`
    (from the cross-validation step)
 
 ## Severity scale
 
 | Level | Meaning                                                | Action                       |
 |-------|--------------------------------------------------------|------------------------------|
-| P0    | Critical — exploitable, data loss, security breach     | Must fix before merge/deploy |
-| P1    | High — significant risk, likely failure mode           | Should fix in this iteration |
-| P2    | Medium — quality issue, minor risk                     | Fix when convenient          |
-| P3    | Low — style, minor optimization                        | Optional improvement         |
+| P0    | Critical: exploitable, data loss, security breach      | Must fix before merge/deploy |
+| P1    | High: significant risk, likely failure mode            | Should fix in this iteration |
+| P2    | Medium: quality issue, minor risk                      | Fix when convenient          |
+| P3    | Low: style, minor optimization                         | Optional improvement         |
 
 ## Fallback chain
 
-See `references/fallback-chain.md`. Order: primary partner → Gemini cascade
-→ DEGRADED. **The DEGRADED mode emits an explicit banner** in stdout and
+See `references/fallback-chain.md`. Order: primary partner -> secondary CLIs
+-> Antigravity Gemini -> DEGRADED. **The DEGRADED mode emits an explicit banner** in stdout and
 returns exit 2 from `call-external.sh` so the SKILL knows to surface it to
 the user.
 
@@ -70,7 +72,7 @@ the user.
 
 - When a review is clean, say so. Do not manufacture findings.
 - When uncertain about severity, use confidence tags.
-- When input is ambiguous, ask — don't guess.
+- When input is ambiguous, ask; don't guess.
 - When degraded mode triggers, **always show the banner**. Silent self-review
   is the failure mode this plugin was designed to prevent.
 

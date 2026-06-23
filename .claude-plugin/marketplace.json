@@ -5,13 +5,13 @@
     "email": "robertoecf@gmail.com"
   },
   "metadata": {
-    "description": "Cross-host adversarial review for coding workflows. Routes review to whichever agent is NOT the host — Codex if you're in Claude Code, Claude Opus if you're in Codex.",
+    "description": "Cross-host adversarial review for coding workflows. Routes review to whichever agent is NOT the host - Codex if you're in Claude Code, Claude Opus if you're in Codex.",
     "version": "0.5.0"
   },
   "plugins": [
     {
       "name": "adversarial-review",
-      "description": "Cross-host adversarial review. Detects host (Claude Code vs Codex) and routes review to the partner agent. Fallback cascade: external partner → Gemini → degraded host-self with explicit warning.",
+      "description": "Cross-host adversarial review. Detects host (Claude Code vs Codex) and routes review to the partner agent. Fallback cascade: external partner -> Grok -> Pi/opencode-go -> Antigravity Gemini -> degraded host-self with explicit warning.",
       "version": "0.5.0",
       "source": "./",
       "author": {

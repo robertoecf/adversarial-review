@@ -6,7 +6,7 @@ Claude CLI is the **external partner** when the host is Codex. The skill sends
 the wrapped prompt through `lib/call-external.sh`, which detects the host and
 (if codex) shells out to `claude -p --model opus --effort xhigh`.
 
-For the full chain (claude → gemini → degraded), see
+For the full chain (claude -> grok -> pi/opencode-go -> Antigravity -> degraded), see
 [`fallback-chain.md`](fallback-chain.md). For host detection, see
 [`host-detection.md`](host-detection.md).
 
@@ -25,7 +25,7 @@ For the full chain (claude → gemini → degraded), see
 which claude || echo "NO_CLAUDE"
 ```
 
-The CLI itself manages its auth — if not logged in, the call will fail loudly
+The CLI itself manages its auth - if not logged in, the call will fail loudly
 rather than hang.
 
 ## Invocation pattern (used by `lib/call-external.sh`)
@@ -44,7 +44,7 @@ Why `--model opus`:
   Opus is the highest-tier model in the Claude family for code analysis.
 
 Why `--effort xhigh`:
-- We want maximum reasoning budget on a critique pass — this is not a hot path.
+- We want maximum reasoning budget on a critique pass - this is not a hot path.
 - Plan / code review is exactly the kind of work that justifies xhigh.
 
 Why `--dangerously-skip-permissions`:
@@ -65,7 +65,7 @@ Why `-p` (print mode):
 | `--dangerously-skip-permissions`        | Skip approval prompts (required for `-p`)        |
 | `--add-dir <path>...`                   | Grant access to additional dirs (for context)    |
 | `--append-system-prompt <text>`         | Add to default system prompt                     |
-| `--bare`                                | Minimal mode — skip hooks, plugins, auto-memory  |
+| `--bare`                                | Minimal mode - skip hooks, plugins, auto-memory  |
 
 ## Anti-recursion contract
 
@@ -78,14 +78,14 @@ review"), the recursion guard in `call-external.sh` refuses (exit 1). See
 ## Cleanup
 
 `lib/call-external.sh` writes operational logs to `/tmp/call-external-claude.err`.
-That file persists by design — useful for debugging. To rotate, just delete it.
+That file persists by design - useful for debugging. To rotate, just delete it.
 
 ## What this plugin does NOT do
 
 - **Does not load CLAUDE.md from the user's repo by default.** `claude -p`
   with no `--add-dir` only sees the current working directory. If the prompt
   needs access to other dirs (worktrees, sibling repos), the skill should
-  pass them via `--add-dir <path>` — but `lib/call-external.sh` does not do
+  pass them via `--add-dir <path>` - but `lib/call-external.sh` does not do
   this automatically. SKILLs that need multi-dir context should construct the
   call themselves or ask the user.
 - **Does not preserve conversation state.** Each `claude -p` is a fresh

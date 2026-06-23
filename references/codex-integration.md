@@ -6,7 +6,7 @@ Codex CLI is the **external partner** when the host is Claude Code. The skill
 sends the wrapped prompt through `lib/call-external.sh`, which detects the host
 and (if claude) shells out to `codex exec --sandbox read-only`.
 
-For the full chain (codex → gemini → degraded), see
+For the full chain (codex -> grok -> pi/opencode-go -> Antigravity -> degraded), see
 [`fallback-chain.md`](fallback-chain.md). For host detection, see
 [`host-detection.md`](host-detection.md).
 
@@ -19,7 +19,7 @@ For the full chain (codex → gemini → degraded), see
 - **Sandbox**: `--sandbox read-only` in this plugin (we never want Codex
   modifying files during review)
 
-## Required config — `forced_login_method`
+## Required config - `forced_login_method`
 
 ⚠️ **Critical gotcha** for ChatGPT-account auth: without this line in
 `~/.codex/config.toml`, `codex exec --json` (the path cc-connect and this
@@ -68,7 +68,7 @@ Why `--skip-git-repo-check`:
   irrelevant.
 
 Why no `--full-auto`:
-- `--full-auto` implies `workspace-write` — incompatible with read-only review.
+- `--full-auto` implies `workspace-write` - incompatible with read-only review.
 
 ## Key flags
 
@@ -92,7 +92,7 @@ refuses (exit 1). See `host-detection.md` for the full anti-recursion chain.
 ## Cleanup
 
 `lib/call-external.sh` writes operational logs to `/tmp/call-external-codex.err`.
-That file persists by design — useful for debugging. To rotate, just delete it.
+That file persists by design - useful for debugging. To rotate, just delete it.
 
 ## What this plugin does NOT do
 
