@@ -38,6 +38,9 @@ non-interactive Antigravity CLI, then degraded host-self with explicit warning.
 - **Codex CLI** needs `--sandbox read-only` for review (we never want writes
   during a critique pass) and `--skip-git-repo-check` since the prompt is the
   unit of review.
+- **Grok CLI** is pinned to `grok-composer-2.5-fast` for the Grok leg.
+  Preferred auth is inherited `XAI_API_KEY`; `grok models` should say `You are
+  using XAI_API_KEY`. This is direct xAI key auth, not OpenRouter.
 - **Pi model chain** uses `pi -p --mode text --no-tools` for `default`, then
   `--model` for explicit fallback models. Run it from the caller's repo/worktree
   root. Default order: Pi default config, `opencode-go/glm-5.2:high`,

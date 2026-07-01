@@ -102,6 +102,9 @@ Notes:
 - Do **not** call `codex exec`, `claude -p`, `grok -p`, or `pi -p` directly - always go through
   `lib/call-external.sh`. The script enforces anti-recursion via the
   `ADVERSARIAL_REVIEW_DEPTH` env counter.
+- Grok external calls default to `grok-composer-2.5-fast` through Grok CLI.
+  Preferred auth is inherited `XAI_API_KEY`, not OpenRouter. Override with
+  `ADVERSARIAL_REVIEW_GROK_MODEL` only if explicitly requested.
 - Pi external calls default to this Pi model chain:
   Pi default config, `opencode-go/glm-5.2:high`, `moonshotai/kimi-k2.7-code-highspeed`.
   The Moonshot leg is direct API via `MOONSHOT_API_KEY`, not OpenRouter.

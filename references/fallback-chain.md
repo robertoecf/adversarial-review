@@ -38,8 +38,9 @@ Run `codex login` once on a fresh machine. For ChatGPT-account auth, ensure
 ```bash
 which grok && grok models
 ```
-Uses headless Grok Build CLI with `grok-composer-2.5-fast` by default. See
-[`grok-integration.md`](grok-integration.md).
+Uses headless Grok Build CLI with `grok-composer-2.5-fast` by default.
+Preferred auth is `XAI_API_KEY`; this is direct xAI key auth, not OpenRouter.
+See [`grok-integration.md`](grok-integration.md).
 
 ### Pi (when earlier external paths fail)
 ```bash

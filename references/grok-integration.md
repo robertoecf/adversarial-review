@@ -39,11 +39,25 @@ if the interactive default changes later.
 
 ## Auth
 
-Grok uses the same session auth as interactive Grok Build CLI (`grok login` or
-`~/.grok/auth.json`). No separate Cursor subscription is required - xAI proxies
-Composer 2.5 through `cli-chat-proxy.grok.com`.
+Preferred local auth is `XAI_API_KEY`. On this machine, `grok models` reports
+`You are using XAI_API_KEY` and lists `grok-composer-2.5-fast`, so the Grok leg
+uses the user's xAI API key, not OpenRouter and not Pi's `xai-oauth` provider.
 
-If headless calls fail with `Auth(AuthorizationRequired)`, run `grok login` once
+Fallback auth is the same session auth as interactive Grok Build CLI (`grok
+login` or `~/.grok/auth.json`).
+
+Do not write the xAI key into this repo. Keep it in the process environment,
+Doppler, shell secret management, or Grok's own auth store.
+
+If headless calls fail with `Auth(AuthorizationRequired)`, first confirm the key
+path:
+
+```bash
+grok models
+```
+
+The output should include both `You are using XAI_API_KEY` and
+`grok-composer-2.5-fast`. If not, restore `XAI_API_KEY` or run `grok login` once
 in an interactive session, then retry.
 
 ## Recommended Grok config
@@ -59,6 +73,7 @@ default = "grok-composer-2.5-fast"
 | Variable | Default | Effect |
 |----------|---------|--------|
 | `ADVERSARIAL_REVIEW_GROK_MODEL` | `grok-composer-2.5-fast` | Model id passed to `grok -m` |
+| `XAI_API_KEY` | inherited from environment | Preferred Grok CLI auth for Composer 2.5 |
 | `ADVERSARIAL_REVIEW_TIMEOUT` | `300` | Wall-clock cap when `timeout(1)` exists |
 
 On macOS, GNU `timeout` is often missing. The script falls back to running
@@ -67,6 +82,11 @@ without a wall-clock cap and logs `WARN: timeout(1) not found`.
 ## Verification
 
 ```bash
+# Non-spending auth/model preflight
+grok models
+# stdout should include: You are using XAI_API_KEY
+# stdout should list: grok-composer-2.5-fast
+
 # Grok as external (unknown host forces grok-first path)
 printf '%s\n' 'Reply with exactly: EXTERNAL_OK' \
   | ADVERSARIAL_REVIEW_HOST=unknown \

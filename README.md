@@ -19,9 +19,10 @@ This plugin enforces that principle automatically:
   `gpt-5.4 xhigh` via ChatGPT subscription auth)
 - Running in **Codex** -> external reviewer is **Claude (Opus, xhigh)** via
   `claude -p`
-- If the primary path fails, try Grok Build CLI, then Pi model chain
-  (Pi default config, `opencode-go/glm-5.2:high`,
-  `moonshotai/kimi-k2.7-code-highspeed` direct API), then Gemini via non-interactive
+- If the primary path fails, try Grok Build CLI with `grok-composer-2.5-fast`
+  through `XAI_API_KEY`, then Pi model chain (Pi default config,
+  `opencode-go/glm-5.2:high`, `moonshotai/kimi-k2.7-code-highspeed` direct API),
+  then Gemini via non-interactive
   Antigravity CLI (`agy --print`)
 - Everything unavailable -> **degraded mode** with explicit banner: the host
   reviews itself, but the user is told the cross-host principle was bypassed
