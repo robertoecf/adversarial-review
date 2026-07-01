@@ -21,7 +21,7 @@ This plugin enforces that principle automatically:
   `claude -p`
 - If the primary path fails, try Grok Build CLI, then Pi model chain
   (Pi default config, `opencode-go/glm-5.2:high`,
-  `opencode-go/kimi-k2.7-code`), then Gemini via non-interactive
+  `moonshotai/kimi-k2.7-code-highspeed` direct API), then Gemini via non-interactive
   Antigravity CLI (`agy --print`)
 - Everything unavailable -> **degraded mode** with explicit banner: the host
   reviews itself, but the user is told the cross-host principle was bypassed

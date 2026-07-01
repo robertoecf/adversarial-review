@@ -50,11 +50,12 @@ Uses headless Pi with this default model chain:
 ```bash
 default
 opencode-go/glm-5.2:high
-opencode-go/kimi-k2.7-code
+moonshotai/kimi-k2.7-code-highspeed
 ```
 
 `default` means Pi is called without `--model`, so Pi's own configured provider,
-model, and thinking level decide the first attempt.
+model, and thinking level decide the first attempt. The Moonshot leg is direct
+Moonshot API via Pi provider `moonshotai`; it is not OpenRouter.
 
 See [`pi-integration.md`](pi-integration.md). The call must stay in the caller's
 repo/worktree root on this machine because the opencode-go key can resolve

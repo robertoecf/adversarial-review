@@ -65,7 +65,7 @@ call_pi() {
     return 1
   fi
 
-  local models_csv="${ADVERSARIAL_REVIEW_PI_MODELS:-${ADVERSARIAL_REVIEW_PI_MODEL:-default,opencode-go/glm-5.2:high,opencode-go/kimi-k2.7-code}}"
+  local models_csv="${ADVERSARIAL_REVIEW_PI_MODELS:-${ADVERSARIAL_REVIEW_PI_MODEL:-default,opencode-go/glm-5.2:high,moonshotai/kimi-k2.7-code-highspeed}}"
   local IFS=,
   local models
   read -r -a models <<< "$models_csv"

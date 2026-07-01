@@ -117,7 +117,8 @@ Notes:
 - Grok external calls default to `grok-composer-2.5-fast`. Override with
   `ADVERSARIAL_REVIEW_GROK_MODEL` if needed.
 - Pi external calls default to this Pi model chain:
-  Pi default config, `opencode-go/glm-5.2:high`, `opencode-go/kimi-k2.7-code`.
+  Pi default config, `opencode-go/glm-5.2:high`, `moonshotai/kimi-k2.7-code-highspeed`.
+  The Moonshot leg is direct API via `MOONSHOT_API_KEY`, not OpenRouter.
   `default` means Pi's configured provider, model, and thinking level. Override
   with `ADVERSARIAL_REVIEW_PI_MODELS` if needed.
   Do not move the call to `/tmp`, because Doppler-scoped opencode-go credentials
@@ -154,7 +155,7 @@ Format:
 ```markdown
 ## Adversarial Code Review
 
-- **Mode**: <external=codex | external=claude-opus | external=grok-composer-2.5-fast | external=pi-default | external=pi-glm-5.2 | external=pi-kimi-k2.7-code | external=antigravity-gemini | DEGRADED>
+- **Mode**: <external=codex | external=claude-opus | external=grok-composer-2.5-fast | external=pi-default | external=pi-glm-5.2 | external=pi-moonshotai-kimi-k2.7-code-highspeed | external=antigravity-gemini | DEGRADED>
 - **Verdict**: SHIP | REVIEW_NEEDED | DO_NOT_MERGE
 - **Findings**: N total - X P0, Y P1, Z P2, W P3
 

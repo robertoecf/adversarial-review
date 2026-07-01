@@ -5,11 +5,22 @@ this default chain:
 
 1. `default`, Pi's configured default provider, model, and thinking level
 2. `opencode-go/glm-5.2:high`
-3. `opencode-go/kimi-k2.7-code`
+3. `moonshotai/kimi-k2.7-code-highspeed`, direct Moonshot API, not OpenRouter
 
-On this machine, `default` currently resolves through Pi settings to the local
-`~/.pi/agent/settings.json` default. The plugin intentionally does not duplicate
-that provider/model in its own config.
+`default` intentionally delegates to Pi settings. The Moonshot fallback uses the
+Pi built-in provider id `moonshotai` and requires `MOONSHOT_API_KEY` in the
+process environment or Pi auth storage.
+
+## Official Moonshot facts
+
+As of 2026-06-30, Kimi's official docs say:
+
+- OpenAI-compatible base URL: `https://api.moonshot.ai/v1`
+- API key header: `Authorization: Bearer $MOONSHOT_API_KEY`
+- Direct model ids include `kimi-k2.7-code` and `kimi-k2.7-code-highspeed`
+- `kimi-k2.7-code-highspeed` is the high-speed variant of the same model
+- For `kimi-k2.7-code`, thinking is always on. Do not pass a disabled thinking
+  parameter.
 
 ## When Pi is used
 
@@ -24,7 +35,7 @@ that provider/model in its own config.
 ## Invocation
 
 ```bash
-IFS=, read -r -a models <<< "${ADVERSARIAL_REVIEW_PI_MODELS:-default,opencode-go/glm-5.2:high,opencode-go/kimi-k2.7-code}"
+IFS=, read -r -a models <<< "${ADVERSARIAL_REVIEW_PI_MODELS:-default,opencode-go/glm-5.2:high,moonshotai/kimi-k2.7-code-highspeed}"
 for model in "${models[@]}"; do
   if [ "$model" = "default" ]; then
     pi -p --mode text --no-tools "$prompt"
@@ -55,12 +66,16 @@ Doppler resolves project scope from the current directory. Running Pi from
 opencode-go" or appear to hang. `call-external.sh` therefore does not `cd` into
 the plugin directory before invoking Pi.
 
+Moonshot direct does not use OpenRouter. It uses Pi's built-in `moonshotai`
+provider, backed by `MOONSHOT_API_KEY`.
+
 ## Env vars
 
 | Variable | Default | Effect |
 |----------|---------|--------|
-| `ADVERSARIAL_REVIEW_PI_MODELS` | `default,opencode-go/glm-5.2:high,opencode-go/kimi-k2.7-code` | Comma-separated Pi model chain, tried in order. The token `default` calls Pi without `--model` |
+| `ADVERSARIAL_REVIEW_PI_MODELS` | `default,opencode-go/glm-5.2:high,moonshotai/kimi-k2.7-code-highspeed` | Comma-separated Pi model chain, tried in order. The token `default` calls Pi without `--model` |
 | `ADVERSARIAL_REVIEW_PI_MODEL` | unset | Back-compat single model override, used only when `ADVERSARIAL_REVIEW_PI_MODELS` is unset. It may also be `default` |
+| `MOONSHOT_API_KEY` | unset | Required by Pi for the direct `moonshotai/...` fallback |
 | `ADVERSARIAL_REVIEW_TIMEOUT` | `300` | Wall-clock cap when `timeout(1)` exists |
 
 ## Model registry check
@@ -68,13 +83,13 @@ the plugin directory before invoking Pi.
 Useful discovery commands:
 
 ```bash
+MOONSHOT_API_KEY=dummy pi --list-models moonshotai/kimi-k2.7-code-highspeed
 pi --list-models k2.7
-pi --list-models kimi
 ```
 
-As of 2026-06-30, Pi exposed `opencode-go/kimi-k2.7-code`
-and `openrouter/moonshotai/kimi-k2.7-code`, but no literal model id named
-`moonshot kimi k2.7 fast`. The default chain uses `opencode-go/kimi-k2.7-code`.
+With no `MOONSHOT_API_KEY`, Pi may omit direct `moonshotai` models from
+`--list-models`. That does not mean OpenRouter should be used. It means the
+Moonshot direct key is not configured for that process.
 
 ## Verification
 
@@ -102,8 +117,9 @@ pi -p --mode text --no-tools 'Reply exactly: PI_DEFAULT_OK'
 pi -p --mode text --no-tools --model opencode-go/glm-5.2:high \
   'Reply exactly: GLM_52_OK'
 
-pi -p --mode text --no-tools --model opencode-go/kimi-k2.7-code \
-  'Reply exactly: KIMI_27_OK'
+MOONSHOT_API_KEY=... pi -p --mode text --no-tools \
+  --model moonshotai/kimi-k2.7-code-highspeed \
+  'Reply exactly: MOONSHOT_KIMI_HIGHSPEED_OK'
 ```
 
 ## Logs

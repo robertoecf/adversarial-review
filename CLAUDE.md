@@ -41,8 +41,9 @@ non-interactive Antigravity CLI, then degraded host-self with explicit warning.
 - **Pi model chain** uses `pi -p --mode text --no-tools` for `default`, then
   `--model` for explicit fallback models. Run it from the caller's repo/worktree
   root. Default order: Pi default config, `opencode-go/glm-5.2:high`,
-  `opencode-go/kimi-k2.7-code`. Do not run it from `/tmp` when opencode-go keys
-  resolve through Doppler scope.
+  `moonshotai/kimi-k2.7-code-highspeed`. The Moonshot leg is direct API via
+  `MOONSHOT_API_KEY`, not OpenRouter. Do not run it from `/tmp` when opencode-go
+  keys resolve through Doppler scope.
 - **Gemini fallback** uses Antigravity CLI non-interactively:
   `agy --print --print-timeout "${ADVERSARIAL_REVIEW_TIMEOUT:-300}s" --sandbox`.
   Do not use the standalone `gemini` CLI for this fallback.
