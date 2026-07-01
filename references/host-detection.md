@@ -3,26 +3,26 @@
 `lib/detect-host.sh` outputs exactly one of `claude`, `codex`, `grok`, `pi`, or `unknown`
 on stdout, exit `0` on success, exit `1` on `unknown`.
 
-## Why this matters — the cross-host principle
+## Why this matters - the cross-host principle
 
 The whole point of this plugin is **the partner reviews, never the host**.
 Detection is what makes that work without manual configuration. If detection
-returns the wrong answer, the skill ends up self-reviewing — a silent failure
+returns the wrong answer, the skill ends up self-reviewing - a silent failure
 mode the principle was designed to forbid.
 
 ## Detection priority (top wins)
 
-1. **`ADVERSARIAL_REVIEW_HOST` env override** — explicit user/test override.
+1. **`ADVERSARIAL_REVIEW_HOST` env override** - explicit user/test override.
    Always wins. Useful for sandboxes, weird wrappers, future hosts, and
    scripted tests.
-2. **Grok Build CLI env markers** — `GROK_HOME`, `GROK_LOG_FILE`, or
+2. **Grok Build CLI env markers** - `GROK_HOME`, `GROK_LOG_FILE`, or
    `GROK_AGENT_SECRET` set.
-3. **Codex env markers** — `CODEX_THREAD_ID` or `CODEX_CI` set. These are set
+3. **Codex env markers** - `CODEX_THREAD_ID` or `CODEX_CI` set. These are set
    *only* by Codex and do **not** leak into nested processes that Codex
    launches from elsewhere.
 4. **Pi env marker**: `PI_CODING_AGENT` set. Checked after Codex so a Codex
    child launched by Pi still detects as Codex.
-5. **Claude Code env markers** — `CLAUDE_CODE_ENTRYPOINT` or
+5. **Claude Code env markers** - `CLAUDE_CODE_ENTRYPOINT` or
    `CLAUDE_AGENT_SDK_VERSION` set. ⚠️ These **do** leak into nested Codex
    processes when Codex is launched by Claude (verified empirically). That's
    why Codex env is checked before Claude env.
@@ -67,7 +67,7 @@ review on the partner side.
 | `ADVERSARIAL_REVIEW_FORCE_DEGRADED`   | If `1`, skip externals entirely; emit degraded banner. Smoke-test helper. |
 | `ADVERSARIAL_REVIEW_TIMEOUT`          | Seconds for the partner call (default 300).                               |
 | `ADVERSARIAL_REVIEW_GROK_MODEL`       | Grok Build CLI model id (default `grok-composer-2.5-fast`).               |
-| `ADVERSARIAL_REVIEW_PI_MODELS`        | Comma-separated Pi/opencode-go model chain.                               |
+| `ADVERSARIAL_REVIEW_PI_MODELS`        | Comma-separated Pi model chain.                               |
 | `ADVERSARIAL_REVIEW_PI_MODEL`         | Back-compat single Pi model id override.                                  |
 | `ADVERSARIAL_REVIEW_ANTIGRAVITY_CMD`  | Antigravity CLI command or absolute path.                                 |
 

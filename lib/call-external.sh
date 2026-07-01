@@ -2,10 +2,10 @@
 # call-external.sh - call the OPPOSITE agent for adversarial review.
 #
 # Cross-host principle: "the partner reviews, never the host"
-#   host=claude → external=codex, then grok, then pi/opencode-go model chain
-#   host=codex  → external=claude, then grok, then pi/opencode-go model chain
-#   host=grok   → external=codex, then claude, then pi/opencode-go model chain
-#   host=pi     → external=codex, then claude, then grok (never pi itself)
+#   host=claude -> external=codex, then grok, then pi model chain
+#   host=codex  -> external=claude, then grok, then pi model chain
+#   host=grok   -> external=codex, then claude, then pi model chain
+#   host=pi     -> external=codex, then claude, then grok (never pi itself)
 #
 # Stdin:  the prompt to send to the external reviewer (multi-line OK)
 # Stdout: external reviewer's analysis in markdown
@@ -65,7 +65,7 @@ call_pi() {
     return 1
   fi
 
-  local models_csv="${ADVERSARIAL_REVIEW_PI_MODELS:-${ADVERSARIAL_REVIEW_PI_MODEL:-opencode-go/glm-5.2:high,opencode-go/deepseek-v4-pro:xhigh,opencode-go/deepseek-v4-flash:xhigh}}"
+  local models_csv="${ADVERSARIAL_REVIEW_PI_MODELS:-${ADVERSARIAL_REVIEW_PI_MODEL:-default,opencode-go/glm-5.2:high,opencode-go/kimi-k2.7-code}}"
   local IFS=,
   local models
   read -r -a models <<< "$models_csv"
@@ -77,6 +77,17 @@ call_pi() {
     model="${model#"${model%%[![:space:]]*}"}"
     model="${model%"${model##*[![:space:]]}"}"
     [ -n "$model" ] || continue
+
+    if [ "$model" = "default" ] || [ "$model" = "pi-default" ] || [ "$model" = "__default__" ]; then
+      log "calling: pi -p --mode text --no-tools (default config, DEPTH=$((DEPTH+1)))"
+      if ADVERSARIAL_REVIEW_DEPTH=$((DEPTH+1)) \
+        run_with_timeout "$TIMEOUT" pi -p --mode text --no-tools "$prompt" \
+        2>>/tmp/call-external-pi.err; then
+        return 0
+      fi
+      log "pi model failed: default config"
+      continue
+    fi
 
     log "calling: pi -p --mode text --no-tools --model ${model} (DEPTH=$((DEPTH+1)))"
     if ADVERSARIAL_REVIEW_DEPTH=$((DEPTH+1)) \

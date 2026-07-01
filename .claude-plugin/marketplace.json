@@ -11,7 +11,7 @@
   "plugins": [
     {
       "name": "adversarial-review",
-      "description": "Cross-host adversarial review. Detects host (Claude Code vs Codex) and routes review to the partner agent. Fallback cascade: external partner -> Grok -> Pi/opencode-go -> Antigravity Gemini -> degraded host-self with explicit warning.",
+      "description": "Cross-host adversarial review. Detects host (Claude Code vs Codex) and routes review to the partner agent. Fallback cascade: external partner -> Grok -> Pi -> Antigravity Gemini -> degraded host-self with explicit warning.",
       "version": "0.5.0",
       "source": "./",
       "author": {

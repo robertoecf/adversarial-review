@@ -1,7 +1,7 @@
 {
   "name": "adversarial-review",
   "version": "0.5.0",
-  "description": "Cross-host adversarial review for coding workflows. Detects which agent host you're running in and routes review to the OTHER agent - Codex if you're in Claude Code, Claude Opus if you're in Codex. Falls back through Grok, Pi/opencode-go, Gemini via Antigravity CLI, then degraded host-self with explicit warning.",
+  "description": "Cross-host adversarial review for coding workflows. Detects which agent host you're running in and routes review to the OTHER agent - Codex if you're in Claude Code, Claude Opus if you're in Codex. Falls back through Grok, Pi, Gemini via Antigravity CLI, then degraded host-self with explicit warning.",
   "author": {
     "name": "Roberto",
     "email": "robertoecf@gmail.com"

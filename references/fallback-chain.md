@@ -48,10 +48,13 @@ which pi && pi --version
 Uses headless Pi with this default model chain:
 
 ```bash
+default
 opencode-go/glm-5.2:high
-opencode-go/deepseek-v4-pro:xhigh
-opencode-go/deepseek-v4-flash:xhigh
+opencode-go/kimi-k2.7-code
 ```
+
+`default` means Pi is called without `--model`, so Pi's own configured provider,
+model, and thinking level decide the first attempt.
 
 See [`pi-integration.md`](pi-integration.md). The call must stay in the caller's
 repo/worktree root on this machine because the opencode-go key can resolve

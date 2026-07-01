@@ -1,14 +1,15 @@
-# Pi/opencode-go model chain integration
+# Pi model chain integration
 
 `lib/call-external.sh` can route adversarial reviews through headless Pi using
-this default model chain:
+this default chain:
 
-1. `opencode-go/glm-5.2:high`
-2. `opencode-go/deepseek-v4-pro:xhigh`
-3. `opencode-go/deepseek-v4-flash:xhigh`
+1. `default`, Pi's configured default provider, model, and thinking level
+2. `opencode-go/glm-5.2:high`
+3. `opencode-go/kimi-k2.7-code`
 
-For the DeepSeek models, Pi maps `xhigh` to the provider's max thinking level
-through `~/.pi/agent/models.json`.
+On this machine, `default` currently resolves through Pi settings to the local
+`~/.pi/agent/settings.json` default. The plugin intentionally does not duplicate
+that provider/model in its own config.
 
 ## When Pi is used
 
@@ -23,9 +24,13 @@ through `~/.pi/agent/models.json`.
 ## Invocation
 
 ```bash
-IFS=, read -r -a models <<< "${ADVERSARIAL_REVIEW_PI_MODELS:-opencode-go/glm-5.2:high,opencode-go/deepseek-v4-pro:xhigh,opencode-go/deepseek-v4-flash:xhigh}"
+IFS=, read -r -a models <<< "${ADVERSARIAL_REVIEW_PI_MODELS:-default,opencode-go/glm-5.2:high,opencode-go/kimi-k2.7-code}"
 for model in "${models[@]}"; do
-  pi -p --mode text --no-tools --model "$model" "$prompt"
+  if [ "$model" = "default" ]; then
+    pi -p --mode text --no-tools "$prompt"
+  else
+    pi -p --mode text --no-tools --model "$model" "$prompt"
+  fi
 done
 ```
 
@@ -54,9 +59,22 @@ the plugin directory before invoking Pi.
 
 | Variable | Default | Effect |
 |----------|---------|--------|
-| `ADVERSARIAL_REVIEW_PI_MODELS` | `opencode-go/glm-5.2:high,opencode-go/deepseek-v4-pro:xhigh,opencode-go/deepseek-v4-flash:xhigh` | Comma-separated model chain passed to `pi --model`, tried in order |
-| `ADVERSARIAL_REVIEW_PI_MODEL` | unset | Back-compat single model override, used only when `ADVERSARIAL_REVIEW_PI_MODELS` is unset |
+| `ADVERSARIAL_REVIEW_PI_MODELS` | `default,opencode-go/glm-5.2:high,opencode-go/kimi-k2.7-code` | Comma-separated Pi model chain, tried in order. The token `default` calls Pi without `--model` |
+| `ADVERSARIAL_REVIEW_PI_MODEL` | unset | Back-compat single model override, used only when `ADVERSARIAL_REVIEW_PI_MODELS` is unset. It may also be `default` |
 | `ADVERSARIAL_REVIEW_TIMEOUT` | `300` | Wall-clock cap when `timeout(1)` exists |
+
+## Model registry check
+
+Useful discovery commands:
+
+```bash
+pi --list-models k2.7
+pi --list-models kimi
+```
+
+As of 2026-06-30, Pi exposed `opencode-go/kimi-k2.7-code`
+and `openrouter/moonshotai/kimi-k2.7-code`, but no literal model id named
+`moonshot kimi k2.7 fast`. The default chain uses `opencode-go/kimi-k2.7-code`.
 
 ## Verification
 
@@ -69,7 +87,8 @@ printf '%s\n' 'Reply with exactly: EXTERNAL_OK' \
     bash lib/call-external.sh 2>/tmp/call-external-pi.err
 ```
 
-The stderr log should include `calling: pi -p --mode text --no-tools --model`.
+The stderr log should include either `calling: pi -p --mode text --no-tools
+(default config` or `calling: pi -p --mode text --no-tools --model`.
 
 For one-off provider/model proof, run Pi separately with `--mode json` and
 inspect the final `message_end` metadata. Do not use JSON mode for routine long
@@ -78,11 +97,13 @@ reviews.
 Useful model proof commands:
 
 ```bash
-pi -p --mode text --no-tools --model opencode-go/deepseek-v4-pro:xhigh \
-  'Reply exactly: DEEPSEEK_PRO_OK'
+pi -p --mode text --no-tools 'Reply exactly: PI_DEFAULT_OK'
 
-pi -p --mode text --no-tools --model opencode-go/deepseek-v4-flash:xhigh \
-  'Reply exactly: DEEPSEEK_FLASH_OK'
+pi -p --mode text --no-tools --model opencode-go/glm-5.2:high \
+  'Reply exactly: GLM_52_OK'
+
+pi -p --mode text --no-tools --model opencode-go/kimi-k2.7-code \
+  'Reply exactly: KIMI_27_OK'
 ```
 
 ## Logs

@@ -19,9 +19,9 @@ This plugin enforces that principle automatically:
   `gpt-5.4 xhigh` via ChatGPT subscription auth)
 - Running in **Codex** -> external reviewer is **Claude (Opus, xhigh)** via
   `claude -p`
-- If the primary path fails, try Grok Build CLI, then Pi/opencode-go model chain
-  (`opencode-go/glm-5.2:high`, `opencode-go/deepseek-v4-pro:xhigh`,
-  `opencode-go/deepseek-v4-flash:xhigh`), then Gemini via non-interactive
+- If the primary path fails, try Grok Build CLI, then Pi model chain
+  (Pi default config, `opencode-go/glm-5.2:high`,
+  `opencode-go/kimi-k2.7-code`), then Gemini via non-interactive
   Antigravity CLI (`agy --print`)
 - Everything unavailable -> **degraded mode** with explicit banner: the host
   reviews itself, but the user is told the cross-host principle was bypassed
@@ -167,7 +167,7 @@ $coding-adversarial-review review my changes: ...
 - `references/host-detection.md` - the override -> env -> PPID walk priority
 - `references/codex-integration.md` - Codex CLI specifics + `forced_login_method` gotcha
 - `references/claude-integration.md` - `claude -p --model opus --effort xhigh`
-- `references/pi-integration.md` - Pi/opencode-go model chain
+- `references/pi-integration.md` - Pi model chain
 - `references/antigravity-integration.md` - Gemini through non-interactive Antigravity CLI
 - `references/fallback-chain.md` - external chain + Antigravity + degraded path
 - `AGENTS.md` - agent-side rules (severity, honesty, anti-recursion contract)

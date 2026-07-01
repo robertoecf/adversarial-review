@@ -6,7 +6,7 @@ Cross-host adversarial review for coding workflows. Detects which agent host
 the SKILL.md is running under and routes review to the OTHER agent: Codex if
 the host is Claude Code, Claude (Opus xhigh) if the host is Codex,
 Codex/Claude if the host is Grok Build CLI, with Grok (Composer 2.5) and the
-Pi/opencode-go model chain as secondary externals. Falls back to Gemini via
+Pi model chain as secondary externals. Falls back to Gemini via
 non-interactive Antigravity CLI, then degraded host-self with explicit warning.
 
 ## Architecture
@@ -38,12 +38,11 @@ non-interactive Antigravity CLI, then degraded host-self with explicit warning.
 - **Codex CLI** needs `--sandbox read-only` for review (we never want writes
   during a critique pass) and `--skip-git-repo-check` since the prompt is the
   unit of review.
-- **Pi/opencode-go model chain** uses `pi -p --mode text --no-tools --model`
-  from the caller's repo/worktree root. Default order:
-  `opencode-go/glm-5.2:high`, `opencode-go/deepseek-v4-pro:xhigh`,
-  `opencode-go/deepseek-v4-flash:xhigh`. For DeepSeek, `xhigh` maps to max
-  thinking. Do not run it from `/tmp` when the opencode-go key is resolved
-  through Doppler scope.
+- **Pi model chain** uses `pi -p --mode text --no-tools` for `default`, then
+  `--model` for explicit fallback models. Run it from the caller's repo/worktree
+  root. Default order: Pi default config, `opencode-go/glm-5.2:high`,
+  `opencode-go/kimi-k2.7-code`. Do not run it from `/tmp` when opencode-go keys
+  resolve through Doppler scope.
 - **Gemini fallback** uses Antigravity CLI non-interactively:
   `agy --print --print-timeout "${ADVERSARIAL_REVIEW_TIMEOUT:-300}s" --sandbox`.
   Do not use the standalone `gemini` CLI for this fallback.

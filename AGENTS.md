@@ -25,11 +25,11 @@ files, blocking-vs-non-blocking ambiguity) without proportionate value.
 
 | Detected host | Partner                              |
 |---------------|--------------------------------------|
-| `claude`      | Codex (`codex exec --sandbox read-only`), then Grok, then Pi/opencode-go, then Antigravity Gemini |
-| `codex`       | Claude (`claude -p --model opus --effort xhigh`), then Grok, then Pi/opencode-go, then Antigravity Gemini |
-| `grok`        | Codex, then Claude, then Pi/opencode-go, then Antigravity Gemini |
+| `claude`      | Codex (`codex exec --sandbox read-only`), then Grok, then Pi, then Antigravity Gemini |
+| `codex`       | Claude (`claude -p --model opus --effort xhigh`), then Grok, then Pi, then Antigravity Gemini |
+| `grok`        | Codex, then Claude, then Pi, then Antigravity Gemini |
 | `pi`          | Codex, then Claude, then Grok, then Antigravity Gemini |
-| `unknown`     | Grok, then Pi/opencode-go, then Gemini via Antigravity |
+| `unknown`     | Grok, then Pi, then Gemini via Antigravity |
 
 Detection happens at every invocation via `lib/detect-host.sh`. See
 `references/host-detection.md` for the priority order and the env-leak

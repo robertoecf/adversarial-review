@@ -6,7 +6,7 @@ call the standalone `gemini` CLI for adversarial-review fallback work.
 ## When Antigravity is used
 
 Antigravity is the final external fallback after the host-specific partner,
-Grok, and Pi/opencode-go paths fail.
+Grok, and Pi model paths fail.
 
 | Detected host | Antigravity role |
 |---------------|------------------|

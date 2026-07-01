@@ -1,6 +1,6 @@
 ---
 name: coding-adversarial-review
-description: "Cross-host adversarial red-team review of code, configs, and diffs. Routes the review to the agent that is NOT the host. Codex from Claude, Claude Opus from Codex, Codex/Claude from Grok Build CLI, with Grok and Pi/opencode-go model chain as secondary externals. Cross-validates against your own independent analysis and returns unified security/robustness critics with severity ratings. Falls back to Gemini via Antigravity, then degraded host-self with explicit warning."
+description: "Cross-host adversarial red-team review of code, configs, and diffs. Routes the review to the agent that is NOT the host. Codex from Claude, Claude Opus from Codex, Codex/Claude from Grok Build CLI, with Grok and Pi model chain as secondary externals. Cross-validates against your own independent analysis and returns unified security/robustness critics with severity ratings. Falls back to Gemini via Antigravity, then degraded host-self with explicit warning."
 version: 0.5.0
 model: inherit
 allowed-tools: ["Read", "Grep", "Glob", "Bash"]
@@ -26,11 +26,11 @@ partner.
 ## Cross-host principle
 
 - You are running in **Claude Code** -> external reviewer is **Codex**, then
-  **Grok Build CLI (Composer 2.5)**, then **Pi/opencode-go model chain** if Codex fails
+  **Grok Build CLI (Composer 2.5)**, then **Pi model chain** if Codex fails
 - You are running in **Codex** -> external reviewer is **Claude (Opus, xhigh)**,
-  then **Grok Build CLI (Composer 2.5)**, then **Pi/opencode-go model chain** if Claude fails
+  then **Grok Build CLI (Composer 2.5)**, then **Pi model chain** if Claude fails
 - You are running in **Grok Build CLI** -> external reviewer is **Codex**, then
-  **Claude (Opus, xhigh)**, then **Pi/opencode-go model chain**. Never Grok itself
+  **Claude (Opus, xhigh)**, then **Pi model chain**. Never Grok itself
 - You are running in **Pi** -> external reviewer is **Codex**, then
   **Claude (Opus, xhigh)**, then **Grok Build CLI**. Never Pi itself
 - All externals unavailable -> **DEGRADED MODE**: host self-review with explicit
@@ -116,10 +116,10 @@ Notes:
   `ADVERSARIAL_REVIEW_DEPTH` env counter.
 - Grok external calls default to `grok-composer-2.5-fast`. Override with
   `ADVERSARIAL_REVIEW_GROK_MODEL` if needed.
-- Pi external calls default to this opencode-go model chain:
-  `opencode-go/glm-5.2:high`, `opencode-go/deepseek-v4-pro:xhigh`,
-  `opencode-go/deepseek-v4-flash:xhigh`. For DeepSeek models, `xhigh` maps to
-  provider max thinking. Override with `ADVERSARIAL_REVIEW_PI_MODELS` if needed.
+- Pi external calls default to this Pi model chain:
+  Pi default config, `opencode-go/glm-5.2:high`, `opencode-go/kimi-k2.7-code`.
+  `default` means Pi's configured provider, model, and thinking level. Override
+  with `ADVERSARIAL_REVIEW_PI_MODELS` if needed.
   Do not move the call to `/tmp`, because Doppler-scoped opencode-go credentials
   resolve from the current directory on this machine.
 - Gemini fallback must run through non-interactive Antigravity CLI:
@@ -154,7 +154,7 @@ Format:
 ```markdown
 ## Adversarial Code Review
 
-- **Mode**: <external=codex | external=claude-opus | external=grok-composer-2.5-fast | external=pi-glm-5.2 | external=pi-deepseek-v4-pro | external=pi-deepseek-v4-flash | external=antigravity-gemini | DEGRADED>
+- **Mode**: <external=codex | external=claude-opus | external=grok-composer-2.5-fast | external=pi-default | external=pi-glm-5.2 | external=pi-kimi-k2.7-code | external=antigravity-gemini | DEGRADED>
 - **Verdict**: SHIP | REVIEW_NEEDED | DO_NOT_MERGE
 - **Findings**: N total - X P0, Y P1, Z P2, W P3
 
@@ -196,7 +196,7 @@ heading:
   `forced_login_method = "chatgpt"` gotcha for ChatGPT-account auth
 - `references/claude-integration.md` - `claude -p --model opus --effort xhigh`
 - `references/grok-integration.md` - `grok -p -m grok-composer-2.5-fast` headless path
-- `references/pi-integration.md` - Pi/opencode-go model chain
+- `references/pi-integration.md` - Pi model chain
 - `references/antigravity-integration.md` - Gemini through non-interactive Antigravity CLI
 - `references/fallback-chain.md` - full external chain + Antigravity + degraded path
 - `references/output-standards.md` - P0-P3 schema, evidence requirements
