@@ -66,8 +66,10 @@ review on the partner side.
 | `ADVERSARIAL_REVIEW_DEPTH`            | Anti-recursion counter (default 0). Set >= 1 to disable cross-host review. |
 | `ADVERSARIAL_REVIEW_FORCE_DEGRADED`   | If `1`, skip externals entirely; emit degraded banner. Smoke-test helper. |
 | `ADVERSARIAL_REVIEW_TIMEOUT`          | Seconds for the partner call (default 300).                               |
-| `ADVERSARIAL_REVIEW_GROK_MODEL`       | Grok Build CLI model id (default `grok-composer-2.5-fast`).               |
-| `ADVERSARIAL_REVIEW_PI_MODELS`        | Comma-separated Pi model chain.                               |
+| `ADVERSARIAL_REVIEW_GROK_MODEL`       | Grok Build CLI model id (default `grok-4.5`).                            |
+| `ADVERSARIAL_REVIEW_GROK_EFFORT`      | Grok Build CLI reasoning effort (default `xhigh`).                       |
+| `ADVERSARIAL_REVIEW_PI_MODELS`        | Comma-separated Pi model chain. Default starts with `xai-oauth/grok-4.5`. |
+| `ADVERSARIAL_REVIEW_PI_THINKING`      | Pi thinking level for the first explicit model token without a `:level` suffix. Default `xhigh`. |
 | `ADVERSARIAL_REVIEW_PI_MODEL`         | Back-compat single Pi model id override.                                  |
 | `ADVERSARIAL_REVIEW_ANTIGRAVITY_CMD`  | Antigravity CLI command or absolute path.                                 |
 

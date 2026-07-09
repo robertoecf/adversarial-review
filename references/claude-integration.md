@@ -2,9 +2,9 @@
 
 ## Role in this plugin
 
-Claude CLI is the **external partner** when the host is Codex. The skill sends
+Claude CLI is the Codex-host fallback after Pi fails. The skill sends
 the wrapped prompt through `lib/call-external.sh`, which detects the host and
-(if codex) shells out to `claude -p --model opus --effort xhigh`.
+(if codex and Pi failed) shells out to `claude -p --model opus --effort xhigh`.
 
 For the full chain (claude -> grok -> pi/opencode-go -> Antigravity -> degraded), see
 [`fallback-chain.md`](fallback-chain.md). For host detection, see

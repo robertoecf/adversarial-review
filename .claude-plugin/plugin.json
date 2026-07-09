@@ -1,13 +1,21 @@
 {
   "name": "adversarial-review",
-  "version": "0.5.0",
-  "description": "Cross-host adversarial review for coding workflows. Detects which agent host you're running in and routes review to the OTHER agent - Codex if you're in Claude Code, Claude Opus if you're in Codex. Falls back through Grok, Pi, Gemini via Antigravity CLI, then degraded host-self with explicit warning.",
+  "version": "0.6.1",
+  "description": "Cross-host adversarial review for coding workflows. Detects which agent host you're running in and routes review to the OTHER agent - Codex if you're in Claude Code, Pi xAI OAuth Grok 4.5 xhigh first if you're in Codex. Falls back through Claude, Grok 4.5 xhigh, Gemini via Antigravity CLI, then degraded host-self with explicit warning.",
   "author": {
     "name": "Roberto",
     "email": "robertoecf@gmail.com"
   },
   "repository": "https://github.com/robertoecf/adversarial-review",
   "license": "MIT",
-  "keywords": ["review", "adversarial", "plan", "code-quality", "cross-host", "codex", "claude"],
+  "keywords": [
+    "review",
+    "adversarial",
+    "plan",
+    "code-quality",
+    "cross-host",
+    "codex",
+    "claude"
+  ],
   "skills": "./skills/"
 }

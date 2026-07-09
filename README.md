@@ -17,13 +17,13 @@ This plugin enforces that principle automatically:
 
 - Running in **Claude Code** -> external reviewer is **Codex** (`codex exec`,
   `gpt-5.4 xhigh` via ChatGPT subscription auth)
-- Running in **Codex** -> external reviewer is **Claude (Opus, xhigh)** via
-  `claude -p`
-- If the primary path fails, try Grok Build CLI with `grok-composer-2.5-fast`
-  through `XAI_API_KEY`, then Pi model chain (Pi default config,
-  `opencode-go/glm-5.2:high`, `moonshotai/kimi-k2.7-code-highspeed` direct API),
-  then Gemini via non-interactive
-  Antigravity CLI (`agy --print`)
+- Running in **Codex** -> external reviewer is **Pi xAI OAuth Grok 4.5 with xhigh thinking**
+  first, then **Claude (Opus, xhigh)** via `claude -p`, then Grok Build CLI
+  with `grok-4.5 --reasoning-effort xhigh`
+- Running in **Claude Code** fallback order after Codex is Grok Build CLI,
+  then Pi model chain (`xai-oauth/grok-4.5` with `--thinking xhigh`, `opencode-go/glm-5.2:high`,
+  `moonshotai/kimi-k2.7-code-highspeed` direct API), then Gemini via
+  non-interactive Antigravity CLI (`agy --print`)
 - Everything unavailable -> **degraded mode** with explicit banner: the host
   reviews itself, but the user is told the cross-host principle was bypassed
 
@@ -52,12 +52,9 @@ The main session does the dispatch and synthesis directly.
 
 ## Skills
 
-| Skill                                             | What it does                                              |
-|---------------------------------------------------|-----------------------------------------------------------|
-| `/adversarial-review:adversarial-plan-review`     | Pre-implementation plan critique. Returns revised plan.  |
-| `/adversarial-review:coding-adversarial-review`   | Red-team code/diff/config. Returns critics + patch.       |
-| `/adversarial-review:prompt-optimize`             | Prompt-engineering analysis (single-host, no external).   |
-| `/adversarial-review:review-all`                  | Classifies input and routes to the right skill above.     |
+| Skill                                             | What it does                                                            |
+|---------------------------------------------------|--------------------------------------------------------------------------|
+| `/adversarial-review:adversarial-review`          | Single entry point. Classifies input (plan, code, prompt) and runs the matching procedure: plan critique with revised plan, red-team code review with patch, or prompt-engineering analysis (host-side, no external). |
 
 In Codex, after running the install script, the same skills are available
 as `$<skill-name>` (Codex prompt-prefix convention).
@@ -68,7 +65,7 @@ as `$<skill-name>` (Codex prompt-prefix convention).
 
 ```bash
 # Add the marketplace and install the plugin
-claude plugin marketplace add ~/repos/coding-plugins/adversarial-review
+claude plugin marketplace add ~/repos/skills/plugins/adversarial-review
 claude plugin install adversarial-review@adversarial-review
 
 # Reload in current session
@@ -79,14 +76,14 @@ claude plugin install adversarial-review@adversarial-review
 
 ```bash
 # Symlinks each skills/<name>/ into ~/.codex/skills/
-bash ~/repos/coding-plugins/adversarial-review/adapters/codex-skill/install.sh
+bash ~/repos/skills/plugins/adversarial-review/adapters/codex-skill/install.sh
 ```
 
 Verify both:
 
 ```bash
 claude plugin list                 # should show adversarial-review enabled
-ls -la ~/.codex/skills/            # should show 4 symlinks back to this repo
+ls -la ~/.codex/skills/            # should show the adversarial-review symlink back to this repo
 ```
 
 ### Prerequisites
@@ -98,11 +95,13 @@ to work (otherwise you'll get DEGRADED mode):
 # When host=claude, partner=codex:
 codex login
 
-# When host=codex, partner=claude:
+# When host=codex, partner=Pi xAI OAuth Grok 4.5 with xhigh thinking first:
+pi --version
+
+# Host=codex fallback after Pi:
 claude  # interactive once to register OAuth, then `claude -p` works headless
 
 # Optional fallback:
-pi --version
 grok --version
 agy --version  # Antigravity CLI, authenticated through the Antigravity app
 ```
@@ -120,12 +119,12 @@ TUI works. See `references/codex-integration.md` for the gotcha details.)
 
 ```bash
 # Detection in Claude Code
-bash ~/repos/coding-plugins/adversarial-review/lib/detect-host.sh
+bash ~/repos/skills/plugins/adversarial-review/lib/detect-host.sh
 # -> claude
 
 # Detection inside Codex
 codex exec --sandbox read-only --skip-git-repo-check \
-  "bash $HOME/repos/coding-plugins/adversarial-review/lib/detect-host.sh"
+  "bash $HOME/repos/skills/plugins/adversarial-review/lib/detect-host.sh"
 # -> codex
 
 # Override
@@ -147,14 +146,11 @@ echo "test" | ADVERSARIAL_REVIEW_DEPTH=1 \
 
 ```bash
 # In Claude Code
-/adversarial-review:adversarial-plan-review            # paste plan or point to file
-/adversarial-review:coding-adversarial-review          # paste code, point to file, or "review uncommitted"
-/adversarial-review:prompt-optimize                    # paste a system prompt or skill definition
-/adversarial-review:review-all                         # paste anything - auto-routes
+/adversarial-review:adversarial-review                 # paste anything - plan, code, diff, prompt, or "review uncommitted"
 
 # In Codex (after running adapters/codex-skill/install.sh)
-$adversarial-plan-review please review the plan I'm about to implement: ...
-$coding-adversarial-review review my changes: ...
+$adversarial-review please review the plan I'm about to implement: ...
+$adversarial-review review my changes: ...
 ```
 
 ## Architecture diagram
