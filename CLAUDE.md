@@ -1,11 +1,11 @@
 # CLAUDE.md - Claude Code directives
 
-## Plugin: adversarial-review v0.5.0
+## Plugin: adversarial-review v0.6.1
 
 Cross-host adversarial review for coding workflows. Detects which agent host
 the SKILL.md is running under and routes review to the OTHER agent: Codex if
-the host is Claude Code, Claude (Opus xhigh) if the host is Codex,
-Codex/Claude if the host is Grok Build CLI, with Grok (Composer 2.5) and the
+the host is Claude Code, Pi xAI OAuth Grok 4.5 with xhigh thinking first if the host is Codex,
+Codex/Claude if the host is Grok Build CLI, with Claude, Grok 4.5 xhigh, and the
 Pi model chain as secondary externals. Falls back to Gemini via
 non-interactive Antigravity CLI, then degraded host-self with explicit warning.
 
@@ -38,15 +38,16 @@ non-interactive Antigravity CLI, then degraded host-self with explicit warning.
 - **Codex CLI** needs `--sandbox read-only` for review (we never want writes
   during a critique pass) and `--skip-git-repo-check` since the prompt is the
   unit of review.
-- **Grok CLI** is pinned to `grok-composer-2.5-fast` for the Grok leg.
-  Preferred auth is inherited `XAI_API_KEY`; `grok models` should say `You are
-  using XAI_API_KEY`. This is direct xAI key auth, not OpenRouter.
-- **Pi model chain** uses `pi -p --mode text --no-tools` for `default`, then
-  `--model` for explicit fallback models. Run it from the caller's repo/worktree
-  root. Default order: Pi default config, `opencode-go/glm-5.2:high`,
+- **Grok CLI** is pinned to `grok-4.5` with `--reasoning-effort xhigh` for the Grok leg.
+  Preferred auth is inherited `XAI_API_KEY`; `grok models` should list `grok-4.5`.
+  This is direct xAI key auth, not OpenRouter.
+- **Pi model chain** uses `pi -p --mode text --no-tools --model` for the
+  default explicit chain. Run it from the caller's repo/worktree root. Default
+  order: `xai-oauth/grok-4.5` with `--thinking xhigh`, `opencode-go/glm-5.2:high`,
   `moonshotai/kimi-k2.7-code-highspeed`. The Moonshot leg is direct API via
-  `MOONSHOT_API_KEY`, not OpenRouter. Do not run it from `/tmp` when opencode-go
-  keys resolve through Doppler scope.
+  `MOONSHOT_API_KEY`, not OpenRouter. The `default` token is still accepted as
+  an override when the caller wants Pi's configured default. Do not run it from
+  `/tmp` when opencode-go keys resolve through Doppler scope.
 - **Gemini fallback** uses Antigravity CLI non-interactively:
   `agy --print --print-timeout "${ADVERSARIAL_REVIEW_TIMEOUT:-300}s" --sandbox`.
   Do not use the standalone `gemini` CLI for this fallback.
@@ -64,21 +65,20 @@ non-interactive Antigravity CLI, then degraded host-self with explicit warning.
 
 ## Available skills (slash refs qualified)
 
-- `/adversarial-review:adversarial-plan-review` - pre-implementation plan critique
-- `/adversarial-review:coding-adversarial-review` - code/diff red-team
-- `/adversarial-review:prompt-optimize` - prompt engineering analysis (single-host, no external)
-- `/adversarial-review:review-all` - input classifier; routes to one of the above
+- `/adversarial-review:adversarial-review` - single entry point: classifies the
+  input (plan, code, prompt) and runs the matching procedure (plan critique,
+  code red-team, or host-side prompt analysis)
 
-In Codex, the same skills are available as `$<skill-name>` after running
+In Codex, the same skill is available as `$adversarial-review` after running
 `bash adapters/codex-skill/install.sh` (symlinks into `~/.codex/skills/`).
 
 ## Plugin dev workflow
 
-- Edit source at `/Users/macbook/repos/coding-plugins/adversarial-review/`
+- Edit source at `/Users/macbook/repos/skills/plugins/adversarial-review/`
 - Reinstall via marketplace:
   ```bash
   claude plugin uninstall adversarial-review 2>/dev/null || true
-  claude plugin marketplace add ~/repos/coding-plugins/adversarial-review
+  claude plugin marketplace add ~/repos/skills/plugins/adversarial-review
   claude plugin install adversarial-review@adversarial-review
   ```
 - Reload in current session: `/reload-plugins`

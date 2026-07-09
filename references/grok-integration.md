@@ -1,14 +1,14 @@
 # Grok Build CLI integration
 
 `lib/call-external.sh` can route adversarial reviews through **Grok Build CLI**
-using the first-party Composer 2.5 model (`grok-composer-2.5-fast` by default).
+using `grok-4.5` with `--reasoning-effort xhigh` by default.
 
 ## When Grok is used
 
 | Detected host | Grok role |
 |---------------|-----------|
 | `claude` | Secondary partner after Codex fails |
-| `codex` | Secondary partner after Claude fails |
+| `codex` | Tertiary fallback after Pi and Claude fail |
 | `grok` | Never called as external (would violate cross-host principle) |
 | `unknown` | First partner tried before Pi and Antigravity |
 
@@ -26,25 +26,21 @@ Or when the process tree contains a `grok` / `grok-build` ancestor.
 
 ```bash
 grok -p "$prompt" \
-  -m "${ADVERSARIAL_REVIEW_GROK_MODEL:-grok-composer-2.5-fast}" \
+  -m "${ADVERSARIAL_REVIEW_GROK_MODEL:-grok-4.5}" \
+  --reasoning-effort "${ADVERSARIAL_REVIEW_GROK_EFFORT:-xhigh}" \
   --yolo \
   --output-format plain \
   --no-auto-update \
   --cwd "${PWD}"
 ```
 
-Headless Grok inherits `~/.grok/config.toml` `[models] default`. The script
-still passes `-m` explicitly so external calls stay pinned to Composer 2.5 even
-if the interactive default changes later.
+Headless Grok can inherit `~/.grok/config.toml` `[models] default`, but the script
+still passes `-m` and `--reasoning-effort` explicitly so external calls stay pinned
+to Grok 4.5 xhigh even if the interactive default changes later.
 
 ## Auth
 
-Preferred local auth is `XAI_API_KEY`. On this machine, `grok models` reports
-`You are using XAI_API_KEY` and lists `grok-composer-2.5-fast`, so the Grok leg
-uses the user's xAI API key, not OpenRouter and not Pi's `xai-oauth` provider.
-
-Fallback auth is the same session auth as interactive Grok Build CLI (`grok
-login` or `~/.grok/auth.json`).
+Preferred local auth is `XAI_API_KEY` or the same session auth as interactive Grok Build CLI. `grok models` should list `grok-4.5`, so the Grok leg uses direct Grok CLI auth, not OpenRouter and not Pi's `xai-oauth` provider.
 
 Do not write the xAI key into this repo. Keep it in the process environment,
 Doppler, shell secret management, or Grok's own auth store.
@@ -56,24 +52,23 @@ path:
 grok models
 ```
 
-The output should include both `You are using XAI_API_KEY` and
-`grok-composer-2.5-fast`. If not, restore `XAI_API_KEY` or run `grok login` once
-in an interactive session, then retry.
+The output should list `grok-4.5`. If auth is missing, restore `XAI_API_KEY` or run `grok login` once in an interactive session, then retry.
 
 ## Recommended Grok config
 
 ```toml
 # ~/.grok/config.toml
 [models]
-default = "grok-composer-2.5-fast"
+default = "grok-4.5"
 ```
 
 ## Env vars
 
 | Variable | Default | Effect |
 |----------|---------|--------|
-| `ADVERSARIAL_REVIEW_GROK_MODEL` | `grok-composer-2.5-fast` | Model id passed to `grok -m` |
-| `XAI_API_KEY` | inherited from environment | Preferred Grok CLI auth for Composer 2.5 |
+| `ADVERSARIAL_REVIEW_GROK_MODEL` | `grok-4.5` | Model id passed to `grok -m` |
+| `ADVERSARIAL_REVIEW_GROK_EFFORT` | `xhigh` | Reasoning effort passed to `grok --reasoning-effort`. Set it empty to omit the flag |
+| `XAI_API_KEY` | inherited from environment | Preferred Grok CLI auth for Grok 4.5 |
 | `ADVERSARIAL_REVIEW_TIMEOUT` | `300` | Wall-clock cap when `timeout(1)` exists |
 
 On macOS, GNU `timeout` is often missing. The script falls back to running
@@ -84,14 +79,13 @@ without a wall-clock cap and logs `WARN: timeout(1) not found`.
 ```bash
 # Non-spending auth/model preflight
 grok models
-# stdout should include: You are using XAI_API_KEY
-# stdout should list: grok-composer-2.5-fast
+# stdout should list: grok-4.5
 
 # Grok as external (unknown host forces grok-first path)
 printf '%s\n' 'Reply with exactly: EXTERNAL_OK' \
   | ADVERSARIAL_REVIEW_HOST=unknown \
     bash lib/call-external.sh 2>/tmp/call-external-grok.err
-# stderr should include: calling: grok -p -m grok-composer-2.5-fast
+# stderr should include: calling: grok -p -m grok-4.5 --reasoning-effort xhigh
 
 # Grok host routes away from itself
 printf '%s\n' 'Reply EXTERNAL_OK' \

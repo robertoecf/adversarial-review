@@ -10,6 +10,9 @@ files serve Pi, Claude Code, and Codex without duplication.
 bash adapters/pi-skill/install.sh
 ```
 
+The installer removes legacy symlinks from the pre-0.6 split skills when they
+point back to this plugin.
+
 Then reload Pi:
 
 ```text
@@ -19,22 +22,19 @@ Then reload Pi:
 Verify:
 
 ```bash
-ls -la ~/.pi/agent/skills | grep -E 'adversarial|review-all|prompt-optimize'
+ls -la ~/.pi/agent/skills | grep adversarial
 ```
 
-You should see symlinks pointing back to this repo's `skills/` subdirs:
+You should see a symlink pointing back to this repo's `skills/` subdir:
 
 ```text
-adversarial-plan-review -> /path/to/coding-plugins/adversarial-review/skills/adversarial-plan-review
-coding-adversarial-review -> ...
-prompt-optimize -> ...
-review-all -> ...
+adversarial-review -> /path/to/skills/plugins/adversarial-review/skills/adversarial-review
 ```
 
 ## Uninstall
 
 ```bash
-rm ~/.pi/agent/skills/{adversarial-plan-review,coding-adversarial-review,prompt-optimize,review-all}
+rm ~/.pi/agent/skills/adversarial-review
 ```
 
 ## Why symlinks vs copies

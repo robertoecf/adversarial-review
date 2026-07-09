@@ -3,7 +3,7 @@
 #
 # Cross-host principle: "the partner reviews, never the host"
 #   host=claude -> external=codex, then grok, then pi model chain
-#   host=codex  -> external=claude, then grok, then pi model chain
+#   host=codex  -> external=pi xai-oauth/grok-4.5 with xhigh thinking, then pi fallbacks, then claude, then grok
 #   host=grok   -> external=codex, then claude, then pi model chain
 #   host=pi     -> external=codex, then claude, then grok (never pi itself)
 #
@@ -21,9 +21,11 @@
 #   ADVERSARIAL_REVIEW_TIMEOUT       seconds; default 300
 #   ADVERSARIAL_REVIEW_FORCE_DEGRADED  if "1", skip externals and go straight to degraded
 #                                      (for non-destructive smoke tests)
-#   ADVERSARIAL_REVIEW_GROK_MODEL      Grok Build CLI model id; default grok-composer-2.5-fast
+#   ADVERSARIAL_REVIEW_GROK_MODEL      Grok Build CLI model id; default grok-4.5
+#   ADVERSARIAL_REVIEW_GROK_EFFORT     Grok Build CLI reasoning effort; default xhigh
 #   ADVERSARIAL_REVIEW_PI_MODEL        Back-compat single Pi model id override
 #   ADVERSARIAL_REVIEW_PI_MODELS       Comma-separated Pi model chain
+#   ADVERSARIAL_REVIEW_PI_THINKING     Pi --thinking level for the first explicit model without a :level suffix; default xhigh
 #   ADVERSARIAL_REVIEW_ANTIGRAVITY_CMD Antigravity CLI command; default agy
 #
 # This script is HOST-AGNOSTIC: detects host at runtime, picks the partner.
@@ -50,14 +52,27 @@ run_with_timeout() {
 }
 
 call_grok() {
-  local model="${ADVERSARIAL_REVIEW_GROK_MODEL:-grok-composer-2.5-fast}"
+  local model="${ADVERSARIAL_REVIEW_GROK_MODEL:-grok-4.5}"
+  local effort
+  if [ "${ADVERSARIAL_REVIEW_GROK_EFFORT+x}" = "x" ]; then
+    effort="$ADVERSARIAL_REVIEW_GROK_EFFORT"
+  else
+    effort="xhigh"
+  fi
   if ! command -v grok >/dev/null 2>&1; then
     return 1
   fi
-  log "calling: grok -p -m ${model} --yolo (DEPTH=$((DEPTH+1)))"
-  ADVERSARIAL_REVIEW_DEPTH=$((DEPTH+1)) \
-    run_with_timeout "$TIMEOUT" grok -p "$prompt" -m "$model" --yolo --output-format plain --no-auto-update --cwd "${PWD}" \
-    2>>/tmp/call-external-grok.err
+  if [ -n "$effort" ]; then
+    log "calling: grok -p -m ${model} --reasoning-effort ${effort} --yolo (DEPTH=$((DEPTH+1)))"
+    ADVERSARIAL_REVIEW_DEPTH=$((DEPTH+1)) \
+      run_with_timeout "$TIMEOUT" grok -p "$prompt" -m "$model" --reasoning-effort "$effort" --yolo --output-format plain --no-auto-update --cwd "${PWD}" \
+      2>>/tmp/call-external-grok.err
+  else
+    log "calling: grok -p -m ${model} --yolo (ADVERSARIAL_REVIEW_GROK_EFFORT empty, DEPTH=$((DEPTH+1)))"
+    ADVERSARIAL_REVIEW_DEPTH=$((DEPTH+1)) \
+      run_with_timeout "$TIMEOUT" grok -p "$prompt" -m "$model" --yolo --output-format plain --no-auto-update --cwd "${PWD}" \
+      2>>/tmp/call-external-grok.err
+  fi
 }
 
 call_pi() {
@@ -65,7 +80,13 @@ call_pi() {
     return 1
   fi
 
-  local models_csv="${ADVERSARIAL_REVIEW_PI_MODELS:-${ADVERSARIAL_REVIEW_PI_MODEL:-default,opencode-go/glm-5.2:high,moonshotai/kimi-k2.7-code-highspeed}}"
+  local models_csv="${ADVERSARIAL_REVIEW_PI_MODELS:-${ADVERSARIAL_REVIEW_PI_MODEL:-xai-oauth/grok-4.5,opencode-go/glm-5.2:high,moonshotai/kimi-k2.7-code-highspeed}}"
+  local pi_thinking
+  if [ "${ADVERSARIAL_REVIEW_PI_THINKING+x}" = "x" ]; then
+    pi_thinking="$ADVERSARIAL_REVIEW_PI_THINKING"
+  else
+    pi_thinking="xhigh"
+  fi
   local IFS=,
   local models
   read -r -a models <<< "$models_csv"
@@ -73,28 +94,55 @@ call_pi() {
   # Keep the caller's PWD. Pi's opencode-go key may be a Doppler reference,
   # and Doppler scope is path-based on this machine.
   local model
+  local model_idx=0
   for model in "${models[@]}"; do
     model="${model#"${model%%[![:space:]]*}"}"
     model="${model%"${model##*[![:space:]]}"}"
     [ -n "$model" ] || continue
+    local is_first_model=0
+    if [ "$model_idx" -eq 0 ]; then
+      is_first_model=1
+    fi
+    model_idx=$((model_idx + 1))
 
     if [ "$model" = "default" ] || [ "$model" = "pi-default" ] || [ "$model" = "__default__" ]; then
-      log "calling: pi -p --mode text --no-tools (default config, DEPTH=$((DEPTH+1)))"
+      log "calling: pi -p --mode text --no-tools --no-session (configured default override, DEPTH=$((DEPTH+1)))"
       if ADVERSARIAL_REVIEW_DEPTH=$((DEPTH+1)) \
-        run_with_timeout "$TIMEOUT" pi -p --mode text --no-tools "$prompt" \
+        run_with_timeout "$TIMEOUT" pi -p --mode text --no-tools --no-session "$prompt" \
         2>>/tmp/call-external-pi.err; then
         return 0
       fi
-      log "pi model failed: default config"
+      log "pi model failed: configured default override"
       continue
     fi
 
-    log "calling: pi -p --mode text --no-tools --model ${model} (DEPTH=$((DEPTH+1)))"
-    if ADVERSARIAL_REVIEW_DEPTH=$((DEPTH+1)) \
-      run_with_timeout "$TIMEOUT" pi -p --mode text --no-tools --model "$model" "$prompt" \
-      2>>/tmp/call-external-pi.err; then
-      return 0
-    fi
+    case "$model" in
+      *:off|*:minimal|*:low|*:medium|*:high|*:xhigh)
+        log "calling: pi -p --mode text --no-tools --no-session --model ${model} (DEPTH=$((DEPTH+1)))"
+        if ADVERSARIAL_REVIEW_DEPTH=$((DEPTH+1)) \
+          run_with_timeout "$TIMEOUT" pi -p --mode text --no-tools --no-session --model "$model" "$prompt" \
+          2>>/tmp/call-external-pi.err; then
+          return 0
+        fi
+        ;;
+      *)
+        if [ "$is_first_model" -eq 1 ] && [ -n "$pi_thinking" ]; then
+          log "calling: pi -p --mode text --no-tools --no-session --model ${model} --thinking ${pi_thinking} (DEPTH=$((DEPTH+1)))"
+          if ADVERSARIAL_REVIEW_DEPTH=$((DEPTH+1)) \
+            run_with_timeout "$TIMEOUT" pi -p --mode text --no-tools --no-session --model "$model" --thinking "$pi_thinking" "$prompt" \
+            2>>/tmp/call-external-pi.err; then
+            return 0
+          fi
+        else
+          log "calling: pi -p --mode text --no-tools --no-session --model ${model} (DEPTH=$((DEPTH+1)))"
+          if ADVERSARIAL_REVIEW_DEPTH=$((DEPTH+1)) \
+            run_with_timeout "$TIMEOUT" pi -p --mode text --no-tools --no-session --model "$model" "$prompt" \
+            2>>/tmp/call-external-pi.err; then
+            return 0
+          fi
+        fi
+        ;;
+    esac
     log "pi model failed: ${model}"
   done
   return 1
@@ -193,12 +241,12 @@ case "$HOST" in
     log "pi failed; trying Gemini via Antigravity"
     ;;
   codex)
+    if call_pi; then exit 0; fi
+    log "pi failed; trying claude"
     if call_claude; then exit 0; fi
     log "claude -p failed; trying grok"
     if call_grok; then exit 0; fi
-    log "grok failed; trying pi"
-    if call_pi; then exit 0; fi
-    log "pi failed; trying Gemini via Antigravity"
+    log "grok failed; trying Gemini via Antigravity"
     ;;
   grok)
     if call_codex; then exit 0; fi

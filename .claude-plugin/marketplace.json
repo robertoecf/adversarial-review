@@ -5,14 +5,14 @@
     "email": "robertoecf@gmail.com"
   },
   "metadata": {
-    "description": "Cross-host adversarial review for coding workflows. Routes review to whichever agent is NOT the host - Codex if you're in Claude Code, Claude Opus if you're in Codex.",
-    "version": "0.5.0"
+    "description": "Cross-host adversarial review for coding workflows. Routes review to whichever agent is NOT the host - Codex if you're in Claude Code, Pi xAI OAuth Grok 4.5 xhigh first if you're in Codex.",
+    "version": "0.6.1"
   },
   "plugins": [
     {
       "name": "adversarial-review",
-      "description": "Cross-host adversarial review. Detects host (Claude Code vs Codex) and routes review to the partner agent. Fallback cascade: external partner -> Grok -> Pi -> Antigravity Gemini -> degraded host-self with explicit warning.",
-      "version": "0.5.0",
+      "description": "Cross-host adversarial review. Detects host and routes review to the partner agent. Fallback cascade: host-specific primary -> secondary partners with Grok 4.5 xhigh / Pi Grok 4.5 xhigh -> Antigravity Gemini -> degraded host-self with explicit warning.",
+      "version": "0.6.1",
       "source": "./",
       "author": {
         "name": "Roberto",
@@ -21,7 +21,15 @@
       "repository": "https://github.com/robertoecf/adversarial-review",
       "license": "MIT",
       "category": "security",
-      "keywords": ["review", "adversarial", "plan", "code-quality", "cross-host", "codex", "claude"]
+      "keywords": [
+        "review",
+        "adversarial",
+        "plan",
+        "code-quality",
+        "cross-host",
+        "codex",
+        "claude"
+      ]
     }
   ]
 }

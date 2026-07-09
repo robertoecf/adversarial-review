@@ -6,7 +6,7 @@ This plugin implements a single principle:
 
 > **The partner reviews, never the host.**
 
-For every review (plan, code, prompt, or routed-to via `review-all`):
+For every review (plan, code, or prompt — all through the single `adversarial-review` skill):
 
 - The agent reading the SKILL.md is the **host**.
 - The host **must not** review the host's own work.
@@ -26,7 +26,7 @@ files, blocking-vs-non-blocking ambiguity) without proportionate value.
 | Detected host | Partner                              |
 |---------------|--------------------------------------|
 | `claude`      | Codex (`codex exec --sandbox read-only`), then Grok, then Pi, then Antigravity Gemini |
-| `codex`       | Claude (`claude -p --model opus --effort xhigh`), then Grok, then Pi, then Antigravity Gemini |
+| `codex`       | Pi model chain, xAI OAuth Grok 4.5 xhigh first, then Claude (`claude -p --model opus --effort xhigh`), then Grok, then Antigravity Gemini |
 | `grok`        | Codex, then Claude, then Pi, then Antigravity Gemini |
 | `pi`          | Codex, then Claude, then Grok, then Antigravity Gemini |
 | `unknown`     | Grok, then Pi, then Gemini via Antigravity |

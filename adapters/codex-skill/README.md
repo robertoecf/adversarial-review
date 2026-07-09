@@ -10,27 +10,27 @@ files serve both Claude Code and Codex without duplication.
 bash adapters/codex-skill/install.sh
 ```
 
+The installer removes legacy symlinks from the pre-0.6 split skills when they
+point back to this plugin.
+
 Verify:
 
 ```bash
 ls -la ~/.codex/skills/
 ```
 
-You should see symlinks pointing back to this repo's `skills/` subdirs:
+You should see a symlink pointing back to this repo's `skills/` subdir:
 
 ```
-adversarial-plan-review -> /path/to/coding-plugins/adversarial-review/skills/adversarial-plan-review
-coding-adversarial-review -> ...
-prompt-optimize -> ...
-review-all -> ...
+adversarial-review -> /path/to/skills/plugins/adversarial-review/skills/adversarial-review
 ```
 
 ## Use
 
-In Codex prompts, reference a skill with the `$` prefix (Codex convention):
+In Codex prompts, reference the skill with the `$` prefix (Codex convention):
 
 ```
-$adversarial-plan-review please review the plan I'm about to implement: ...
+$adversarial-review please review the plan I'm about to implement: ...
 ```
 
 Codex will load the matching SKILL.md and follow its instructions.
@@ -38,7 +38,7 @@ Codex will load the matching SKILL.md and follow its instructions.
 ## Uninstall
 
 ```bash
-rm ~/.codex/skills/{adversarial-plan-review,coding-adversarial-review,prompt-optimize,review-all}
+rm ~/.codex/skills/adversarial-review
 ```
 
 ## Why symlinks vs copies
