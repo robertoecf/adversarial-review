@@ -42,15 +42,28 @@ it sees `≥ 1`, it refuses with exit `1`. Before invoking the partner, it
 sets `ADVERSARIAL_REVIEW_DEPTH=1` in the partner's env. So if a launched
 partner ever re-triggers this skill, the guard fires. Never disable.
 
+## Critique discipline (v0.7+)
+
+- **Stance**: break confidence; do not validate. No credit for intent or likely follow-up.
+- **Attack surface**: prioritize expensive failures (auth/trust, data loss, rollback/idempotency, races, degraded deps, migrations, observability gaps).
+- **Finding bar**: material only — what fails, why vulnerable, impact, concrete fix. Prefer one strong finding over many weak ones. Clean review with zero findings is valid.
+- **Focus**: user focus weights the pass; other material issues still report.
+- **Summary**: terse ship/no-ship first (≤200 tokens), not a neutral recap.
+- Details: `references/codex-lessons.md`, `references/output-standards.md`.
+
 ## Output integrity (for synthesis by the host)
 
 Every finding in the final output MUST include:
 
 1. **Severity**: P0 (critical) / P1 (high) / P2 (medium) / P3 (low)
 2. **Evidence**: direct quote, file:line reference, or concrete scenario
-3. **Recommendation**: specific, actionable fix
-4. **Origin tag**: `[cross-validated]` / `[external-only]` / `[host-only]`
+3. **Impact**: user/data/security/ops consequence
+4. **Recommendation**: specific, actionable fix
+5. **Confidence**: high | medium | low
+6. **Origin tag**: `[cross-validated]` / `[external-only]` / `[host-only]`
    (from the cross-validation step)
+
+Do not invent files, lines, or attack chains. Mark inferences.
 
 ## Severity scale
 
@@ -58,8 +71,8 @@ Every finding in the final output MUST include:
 |-------|--------------------------------------------------------|------------------------------|
 | P0    | Critical: exploitable, data loss, security breach      | Must fix before merge/deploy |
 | P1    | High: significant risk, likely failure mode            | Should fix in this iteration |
-| P2    | Medium: quality issue, minor risk                      | Fix when convenient          |
-| P3    | Low: style, minor optimization                         | Optional improvement         |
+| P2    | Medium: material quality/reliability, limited blast    | Fix when convenient          |
+| P3    | Low: only if still material — not style dump           | Optional improvement         |
 
 ## Fallback chain
 

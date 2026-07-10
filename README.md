@@ -1,8 +1,13 @@
 # adversarial-review
 
-Cross-host adversarial review for coding workflows. Works in **both Claude
-Code and Codex** from the same source - detects which agent host you're
-running in and routes the heavy critique to the OTHER agent.
+**v0.7.0** — Cross-host adversarial review for coding workflows. Works in
+**Claude Code, Codex, Pi, and Grok** from the same source: detects which agent
+host you're running in and routes the heavy critique to the OTHER agent.
+
+Critique discipline (v0.7): break confidence rather than validate; expensive
+attack surfaces first; material-only findings; steerable focus; terse
+ship/no-ship summary. Lessons adapted from OpenAI Codex Companion — see
+`references/codex-lessons.md`.
 
 ## The principle
 
@@ -16,7 +21,7 @@ highest-value findings - the ones a single reviewer would miss.
 This plugin enforces that principle automatically:
 
 - Running in **Claude Code** -> external reviewer is **Codex** (`codex exec`,
-  `gpt-5.4 xhigh` via ChatGPT subscription auth)
+  `gpt-5.6-sol xhigh` via ChatGPT subscription auth)
 - Running in **Codex** -> external reviewer is **Pi xAI OAuth Grok 4.5 with xhigh thinking**
   first, then **Claude (Opus, xhigh)** via `claude -p`, then Grok Build CLI
   with `grok-4.5 --reasoning-effort xhigh`
@@ -161,6 +166,9 @@ $adversarial-review review my changes: ...
 
 ## See also
 
+- `references/codex-lessons.md` - stance/attack-surface/finding-bar adopted from Codex Companion
+- `references/output-standards.md` - P0-P3, material bar, header/summary contract
+- `PLANS.md` - upgrade plan + future pi-companion plan
 - `references/host-detection.md` - the override -> env -> PPID walk priority
 - `references/codex-integration.md` - Codex CLI specifics + `forced_login_method` gotcha
 - `references/claude-integration.md` - `claude -p --model opus --effort xhigh`
