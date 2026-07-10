@@ -34,13 +34,14 @@ even though the interactive TUI works fine with the same auth. The fix:
 
 ```toml
 # ~/.codex/config.toml
-model = "gpt-5.4"
+model = "gpt-5.6-sol"
 model_reasoning_effort = "xhigh"
 forced_login_method = "chatgpt"   # ← required for ChatGPT-account exec mode
 ```
 
 The `forced_login_method` directive locks the model resolution to the
-ChatGPT subscription endpoint that includes `gpt-5.4` in its catalog.
+ChatGPT subscription endpoint that includes the configured model in its
+catalog (the original 404 above was hit with `gpt-5.4`).
 Tracking issues that surfaced this: openai/codex#14266, #14190, #11927.
 
 If you only have an OpenAI API key (no ChatGPT subscription), instead set

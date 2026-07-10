@@ -1,7 +1,7 @@
 ---
 name: adversarial-review
 description: "Cross-host adversarial review of any artifact — implementation plans, code/diffs/configs, or prompts/skill definitions. Classifies the input by context, then routes the heavy critique to the agent that is NOT the host (Codex from Claude, Pi chain from Codex, etc.), cross-validates against independent host-side analysis, and returns unified critics with severity ratings and a verdict. Prompts are analyzed host-side across 6 dimensions. Falls back to Gemini via Antigravity, then degraded host-self with explicit warning."
-version: 0.6.1
+version: 0.7.0
 model: inherit
 allowed-tools: ["Read", "Grep", "Glob", "Bash"]
 triggers:
@@ -30,6 +30,28 @@ work** — for plans and code, route the heavy critique to the other agent via
 PLUGIN_DIR="$HOME/repos/skills/plugins/adversarial-review"
 ```
 
+## Operating stance (all procedures)
+
+Your job is to **break confidence** in the artifact, not to validate it.
+
+- Default to skepticism. Assume subtle, high-cost, or user-visible failure until
+  evidence says otherwise.
+- Do **not** give credit for good intent, partial fixes, or “likely follow-up”.
+- Happy-path-only behavior is a real weakness.
+- Be aggressive, but **grounded**: every finding must be defensible from the
+  provided context or tool output. Do not invent files, lines, attack chains,
+  or runtime behavior. If you infer, say so and keep confidence honest.
+- **Finding bar**: report only material findings. No style, naming, low-value
+  cleanup, or speculation without evidence. Prefer **one strong finding** over
+  several weak ones. If it looks safe, say so and return no findings.
+- Each finding must answer:
+  1. What can go wrong?
+  2. Why is this path vulnerable?
+  3. What is the likely impact?
+  4. What concrete change reduces the risk?
+
+See `references/codex-lessons.md` for the Codex Companion sources of this stance.
+
 ## Step 0 — Classify the input
 
 | Input type          | Detection heuristic                                                                | Procedure        |
@@ -43,6 +65,14 @@ PLUGIN_DIR="$HOME/repos/skills/plugins/adversarial-review"
 Resolve the input first: inline text → use it; file path → `Read` it;
 "review uncommitted" → `git diff` (or `--staged`); "review --base main" →
 `git diff main...HEAD`. No input → ask for it.
+
+### Focus text (steerable)
+
+If the user supplies a focus area (e.g. “race conditions in checkout”, “auth
+boundary”, “rollback”), **weight it heavily** in the partner prompt and in your
+own pass. Still report any other **material** issue you can defend — focus is a
+priority hint, not a blindfold. Pass focus into the templates as `{FOCUS_TEXT}`
+(use `none` when absent).
 
 ## Cross-host principle (plan and code reviews)
 
@@ -102,27 +132,38 @@ echo "exit=$?"
 
 ## Procedure A — Plan review
 
-External-reviewer prompt template (replace `{PLAN_TEXT}`):
+External-reviewer prompt template (replace `{PLAN_TEXT}` and `{FOCUS_TEXT}`):
 
 ```
-You are an adversarial plan reviewer. Assume this plan will fail. Prove it.
+You are an adversarial plan reviewer. Your job is to break confidence in this
+plan, not to validate it. Assume it will fail in expensive or subtle ways.
+Prove it. Do not credit good intent or likely follow-up work.
+
+FOCUS (weight heavily; still report other material issues): {FOCUS_TEXT}
 
 PLAN:
 {PLAN_TEXT}
 
-Validate for:
-1. Scope alignment - does the plan match stated objectives?
-2. Missing steps - gaps in sequence (testing, migration, rollback)?
-3. Dependency ordering - can steps execute as ordered? Circular deps?
-4. Rollback strategy - what if step N fails? Reversible?
-5. Blast radius - what existing functionality is at risk?
-6. Success criteria - verifiable completion conditions?
-7. Cost estimate - complexity, files changed, test impact
+Attack the plan for:
+1. Scope misalignment — does the plan match stated objectives, or smuggle work?
+2. Missing steps — testing, migration, rollback, observability, auth?
+3. Dependency ordering — can steps run as ordered? Hidden circular deps?
+4. Rollback / partial failure — what if step N fails mid-way? Reversible?
+5. Blast radius — what existing functionality dies if this ships wrong?
+6. Success criteria — verifiable completion conditions, or vibes?
+7. Cost / complexity — files touched, migration risk, test impact understated?
+8. Assumptions that stop being true under load, empty state, or multi-tenant use.
+
+Finding bar: material only. Each finding answers: what fails, why the plan is
+vulnerable, impact, concrete change. Prefer one strong finding over many weak
+ones. No style nits. If the plan is sound, say so and return no findings.
 
 Output language: same as the input plan.
 Sections: BLOCKERS / SHOULD FIX / NICE TO HAVE / VERDICT
-Per finding: P0-P3 severity, evidence (line of plan), problem, recommendation.
+Per finding: P0-P3 severity, evidence (line of plan), problem, impact,
+recommendation.
 Verdict: PROCEED / REVIEW_NEEDED / RETHINK
+Opening line: terse ship/no-ship assessment of the plan (not a neutral recap).
 Provide an improved version of the plan incorporating the recommendations.
 ```
 
@@ -133,35 +174,65 @@ text, not a diff), and **Key Changes from Original**.
 
 ## Procedure B — Code review (red team)
 
-External-reviewer prompt template (replace `{CODE_TEXT}`):
+External-reviewer prompt template (replace `{CODE_TEXT}`, `{TARGET_LABEL}`,
+and `{FOCUS_TEXT}`):
 
 ```
-You are a red-team security and reliability analyst. Assume everything will
-fail. Prove it with concrete exploit scenarios.
+You are performing an adversarial software review.
+Your job is to break confidence in the change, not to validate it.
 
-CODE:
+Target: {TARGET_LABEL}
+User focus: {FOCUS_TEXT}
+
+Default to skepticism. Assume the change can fail in subtle, high-cost, or
+user-visible ways until the evidence says otherwise. Do not give credit for
+good intent, partial fixes, or likely follow-up work. Happy-path-only = weakness.
+
+CODE / DIFF:
 {CODE_TEXT}
 
-Review for:
-1. SECURITY: injection, auth bypass, data exposure, OWASP top 10, secrets,
-   crypto misuse, deserialization, SSRF.
-2. ROBUSTNESS: race conditions, failure cascades, resource exhaustion,
-   timeouts, error handling gaps, retry storms.
-3. CORRECTNESS: off-by-one, type confusion, null/undef paths, locale/timezone,
-   floating-point, integer overflow.
-4. CONCURRENCY: data races, deadlocks, ordering, cache coherence.
-5. OBSERVABILITY: missing logs at failure points, secrets in logs, metric gaps.
-6. SUPPLY CHAIN: pinned versions? lockfile? typo-squat risk?
-7. BLAST RADIUS: who else does this break if deployed?
+Prioritize expensive, dangerous, or hard-to-detect failures:
+- auth, permissions, tenant isolation, and trust boundaries
+- data loss, corruption, duplication, and irreversible state changes
+- rollback safety, retries, partial failure, and idempotency gaps
+- race conditions, ordering assumptions, stale state, and re-entrancy
+- empty-state, null, timeout, and degraded dependency behavior
+- version skew, schema drift, migration hazards, and compatibility regressions
+- observability gaps that would hide failure or make recovery harder
+
+Also cover classic failure classes when material:
+- SECURITY: injection, auth bypass, data exposure, secrets, crypto misuse, SSRF
+- CORRECTNESS: off-by-one, type confusion, null paths, timezone/locale, overflow
+- SUPPLY CHAIN: pins, lockfile, typo-squat — only if evidence in the change
+
+Method: actively try to disprove the change. Trace bad inputs, retries,
+concurrent actions, and partial completion through the code. Weight the user
+focus heavily, but still report any other material issue you can defend.
+
+Finding bar — each finding must answer:
+1. What can go wrong?
+2. Why is this code path vulnerable?
+3. What is the likely impact?
+4. What concrete change would reduce the risk?
+
+Report only material findings. No style, naming, low-value cleanup, or
+speculation without evidence. Prefer one strong finding over several weak ones.
+If the change looks safe, say so directly and return no findings.
+
+Grounding: every finding must be defensible from the provided context. Do not
+invent files, lines, incidents, or runtime behavior. Mark inferences and keep
+confidence honest.
 
 Output language: same as the input.
+Opening line: terse ship/no-ship assessment (not a neutral recap).
 Sections: BLOCKERS / SHOULD FIX / NICE TO HAVE / VERDICT
-Per finding: P0-P3 severity, evidence (file:line or quote), problem,
-exploit/scenario, recommendation.
+Per finding: P0-P3 severity, evidence (file:line or quote), problem, impact /
+exploit scenario, recommendation, confidence (high|medium|low).
 Verdict: SHIP / REVIEW_NEEDED / DO_NOT_MERGE
 ```
 
-Then: independent host-side red-team pass → cross-validate → unified output
+Then: independent host-side adversarial pass (same stance and attack surface,
+without looking at the partner's output) → cross-validate → unified output
 with verdict SHIP | REVIEW_NEEDED | DO_NOT_MERGE, critics, a **Recommended
 Patch** (unified diff when practical), and **Key Risks if Merged As-Is**.
 
@@ -181,9 +252,14 @@ Unified output header (both procedures):
 ## Adversarial Review — <Plan | Code>
 
 - **Mode**: <external=codex | external=claude-opus | external=grok-4.5-xhigh | external=pi-grok-4.5-xhigh | external=pi-* | external=antigravity-gemini | DEGRADED>
+- **Target**: <working tree | branch vs base | file | pasted artifact>
+- **Focus**: <user focus or none>
 - **Verdict**: <see procedure>
 - **Findings**: N total - X P0, Y P1, Z P2, W P3
 ```
+
+Immediately after the header: **≤200 tokens** ship/no-ship summary (top risks
+only). Then findings. Drop P3 before P2 if you must cut; never drop P0/P1.
 
 **If `lib/call-external.sh` exited `2`**, prepend this banner verbatim before
 the heading:
@@ -204,6 +280,9 @@ hedging), **instruction conflicts** (contradictions, precedence ambiguity,
 buried overrides), **structural integrity** (buried critical instructions,
 poor hierarchy, front/back-loading).
 
+Apply the same material-only finding bar: no cosmetic rewrites without a
+defensible failure mode.
+
 Modes: **A Critique** ("critique this prompt") → issue list only, ≤800 tokens.
 **B Optimize** (default) → issues + optimized version + diff + change log,
 ≤1500 tokens. **C Compare** (two inputs) → side-by-side scoring table +
@@ -219,6 +298,7 @@ Output per finding: `[P0-P3] [dimension]: title` + evidence (quote) + problem
 
 ## References
 
+- `references/codex-lessons.md` — what we took from Codex Companion (and what we didn't)
 - `references/host-detection.md` — how `lib/detect-host.sh` decides
 - `references/codex-integration.md` — Codex CLI invocation, incl. the
   `forced_login_method = "chatgpt"` gotcha

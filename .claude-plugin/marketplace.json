@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "Cross-host adversarial review for coding workflows. Routes review to whichever agent is NOT the host - Codex if you're in Claude Code, Pi xAI OAuth Grok 4.5 xhigh first if you're in Codex.",
-    "version": "0.6.1"
+    "version": "0.7.0"
   },
   "plugins": [
     {
       "name": "adversarial-review",
-      "description": "Cross-host adversarial review. Detects host and routes review to the partner agent. Fallback cascade: host-specific primary -> secondary partners with Grok 4.5 xhigh / Pi Grok 4.5 xhigh -> Antigravity Gemini -> degraded host-self with explicit warning.",
-      "version": "0.6.1",
+      "description": "Cross-host adversarial review. Break-confidence stance, material-only findings. Detects host and routes review to the partner agent. Fallback cascade: host-specific primary -> secondary partners with Grok 4.5 xhigh / Pi Grok 4.5 xhigh -> Antigravity Gemini -> degraded host-self with explicit warning.",
+      "version": "0.7.0",
       "source": "./",
       "author": {
         "name": "Roberto",

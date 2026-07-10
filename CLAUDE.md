@@ -1,6 +1,6 @@
 # CLAUDE.md - Claude Code directives
 
-## Plugin: adversarial-review v0.6.1
+## Plugin: adversarial-review v0.7.0
 
 Cross-host adversarial review for coding workflows. Detects which agent host
 the SKILL.md is running under and routes review to the OTHER agent: Codex if
@@ -8,6 +8,10 @@ the host is Claude Code, Pi xAI OAuth Grok 4.5 with xhigh thinking first if the 
 Codex/Claude if the host is Grok Build CLI, with Claude, Grok 4.5 xhigh, and the
 Pi model chain as secondary externals. Falls back to Gemini via
 non-interactive Antigravity CLI, then degraded host-self with explicit warning.
+
+v0.7 hardens critique discipline (Codex Companion lessons): break-confidence
+stance, expensive attack surface first, material-only finding bar, steerable
+focus, terse ship/no-ship summary. See `references/codex-lessons.md`.
 
 ## Architecture
 

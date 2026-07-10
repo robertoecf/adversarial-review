@@ -1,7 +1,7 @@
 {
   "name": "adversarial-review",
-  "version": "0.6.1",
-  "description": "Cross-host adversarial review for coding workflows. Detects which agent host you're running in and routes review to the OTHER agent - Codex if you're in Claude Code, Pi xAI OAuth Grok 4.5 xhigh first if you're in Codex. Falls back through Claude, Grok 4.5 xhigh, Gemini via Antigravity CLI, then degraded host-self with explicit warning.",
+  "version": "0.7.0",
+  "description": "Cross-host adversarial review for coding workflows. Breaks confidence in plans/code via partner routing (never silent self-review). Codex if you're in Claude Code; Pi xAI OAuth Grok 4.5 xhigh first if you're in Codex. Material-only findings, expensive attack surfaces first. Falls back through Claude, Grok, Gemini via Antigravity, then degraded host-self with explicit warning.",
   "author": {
     "name": "Roberto",
     "email": "robertoecf@gmail.com"
