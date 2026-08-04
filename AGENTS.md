@@ -25,11 +25,11 @@ files, blocking-vs-non-blocking ambiguity) without proportionate value.
 
 | Detected host | Partner                              |
 |---------------|--------------------------------------|
-| `claude`      | Codex (`codex exec --sandbox read-only`), then Grok, then Pi, then Antigravity Gemini |
-| `codex`       | Pi model chain, xAI OAuth Grok 4.5 xhigh first, then Claude (`claude -p --model opus --effort xhigh`), then Grok, then Antigravity Gemini |
-| `grok`        | Codex, then Claude, then Pi, then Antigravity Gemini |
-| `pi`          | Codex, then Claude, then Grok, then Antigravity Gemini |
-| `unknown`     | Grok, then Pi, then Gemini via Antigravity |
+| `claude`      | Code: direct-xAI Grok 4.5, Codex Luna max, Pi. Plan: Codex Luna max, direct-xAI Grok 4.5, Pi. Then Antigravity |
+| `codex`       | Pi chain (xAI OAuth Grok 4.5 xhigh, GLM, Moonshot Kimi K3), then Claude, direct xAI, and Antigravity |
+| `grok`        | Codex GPT-5.6 Luna max, then Claude, non-xAI Pi (GLM then Kimi), and the Antigravity ladder |
+| `pi`          | Codex GPT-5.6 Luna max, then Claude, direct xAI, and the Antigravity ladder |
+| `unknown`     | Direct xAI, then Pi, then the Antigravity ladder |
 
 Detection happens at every invocation via `lib/detect-host.sh`. See
 `references/host-detection.md` for the priority order and the env-leak
@@ -42,11 +42,12 @@ it sees `≥ 1`, it refuses with exit `1`. Before invoking the partner, it
 sets `ADVERSARIAL_REVIEW_DEPTH=1` in the partner's env. So if a launched
 partner ever re-triggers this skill, the guard fires. Never disable.
 
-## Critique discipline (v0.7+)
+## Critique discipline (v0.8.1+)
 
 - **Stance**: break confidence; do not validate. No credit for intent or likely follow-up.
 - **Attack surface**: prioritize expensive failures (auth/trust, data loss, rollback/idempotency, races, degraded deps, migrations, observability gaps).
 - **Finding bar**: material only — what fails, why vulnerable, impact, concrete fix. Prefer one strong finding over many weak ones. Clean review with zero findings is valid.
+- **Over-engineering**: every plan/code review runs a simplicity counterfactual with required behavior and safety held fixed. Challenge YAGNI, false seams, duplicate ownership, and missed in-repo reuse, including canonical Effect implementations. LOC or framework taste alone is never a finding. An OE finding requires a path/line or plan-section anchor, cited evidence plus material failure/cost/risk, and a simpler alternative that preserves behavior and safety; see `references/output-standards.md`.
 - **Focus**: user focus weights the pass; other material issues still report.
 - **Summary**: terse ship/no-ship first (≤200 tokens), not a neutral recap.
 - Details: `references/codex-lessons.md`, `references/output-standards.md`.
@@ -77,7 +78,7 @@ Do not invent files, lines, or attack chains. Mark inferences.
 ## Fallback chain
 
 See `references/fallback-chain.md`. Order: primary partner -> secondary CLIs
--> Antigravity Gemini -> DEGRADED. **The DEGRADED mode emits an explicit banner** in stdout and
+-> quality-first Antigravity ladder -> DEGRADED. **The DEGRADED mode emits an explicit banner** in stdout and
 returns exit 2 from `call-external.sh` so the SKILL knows to surface it to
 the user.
 

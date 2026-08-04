@@ -13,11 +13,12 @@ re-rank or fall through after success.
 
 | Detected host | Primary partner            | Secondary partner                  | Third partner                 | Tertiary fallback             | Last resort                   |
 |---------------|----------------------------|------------------------------------|-------------------------------|-------------------------------|-------------------------------|
-| `claude`      | Codex (`codex exec`)       | Grok (`grok -p` Grok 4.5 xhigh)      | Pi model chain | Gemini via Antigravity CLI    | DEGRADED: host self-review    |
-| `codex`       | Pi model chain, xAI OAuth Grok 4.5 xhigh first | Claude (`claude -p` Opus xhigh) | Grok (`grok -p` Grok 4.5 xhigh) | Gemini via Antigravity CLI       | DEGRADED: host self-review    |
-| `grok`        | Codex (`codex exec`)       | Claude (`claude -p` Opus xhigh)    | Pi model chain | Gemini via Antigravity CLI       | DEGRADED: host self-review    |
-| `pi`          | Codex (`codex exec`)       | Claude (`claude -p` Opus xhigh)    | Grok (`grok -p` Grok 4.5 xhigh) | Gemini via Antigravity CLI         | DEGRADED: host self-review    |
-| `unknown`     | Grok (`grok -p` Grok 4.5 xhigh) | Pi model chain | none                          | Gemini via Antigravity CLI                | DEGRADED: host self-review    |
+| `claude`, artifact=code (default) | Direct xAI, Grok 4.5 high | Codex (`gpt-5.6-luna` max) | Pi model chain | Antigravity model ladder | DEGRADED: host self-review |
+| `claude`, artifact=plan | Codex (`gpt-5.6-luna` max) | Direct xAI, Grok 4.5 high | Pi model chain | Antigravity model ladder | DEGRADED: host self-review |
+| `codex`       | Pi model chain, xAI OAuth Grok 4.5 xhigh first | Claude (`claude -p` Opus xhigh) | Direct xAI | Antigravity model ladder | DEGRADED: host self-review |
+| `grok`        | Codex (`gpt-5.6-luna` max) | Claude (`claude -p` Opus xhigh) | Non-xAI Pi chain, GLM then Kimi | Antigravity model ladder | DEGRADED: host self-review |
+| `pi`          | Codex (`gpt-5.6-luna` max) | Claude (`claude -p` Opus xhigh) | Direct xAI | Antigravity model ladder | DEGRADED: host self-review |
+| `unknown`     | Direct xAI | Pi model chain | none | Antigravity model ladder | DEGRADED: host self-review |
 
 The official `openai/codex-plugin-cc` plugin (slash command
 `/codex:adversarial-review`) is **not** required. We invoke `codex exec`
@@ -26,7 +27,13 @@ installed.
 
 ## Detection: primary partner
 
-### Codex (when host=claude)
+Host `claude` order is artifact-aware (user decision 2026-07-11, env
+`ADVERSARIAL_REVIEW_ARTIFACT`, default `code`): code/diff reviews go to Grok
+first because the diff is normally Codex-authored and Codex reviewing its own
+code would be same-family; plan reviews go to Codex first because the plan is
+architect(Claude)-authored.
+
+### Codex (when host=claude and artifact=plan, or fallback for artifact=code)
 ```bash
 which codex && test -f ~/.codex/auth.json && echo "CODEX_OK"
 ```
@@ -34,12 +41,18 @@ Run `codex login` once on a fresh machine. For ChatGPT-account auth, ensure
 `forced_login_method = "chatgpt"` is set in `~/.codex/config.toml` (see
 [`codex-integration.md`](codex-integration.md)).
 
-### Grok (when host=claude, host=codex after Pi and Claude fail, or first when host=unknown)
+The reviewer invocation pins `-m gpt-5.6-luna` and
+`-c model_reasoning_effort=max`; the interactive Codex default is irrelevant
+to this leg.
+
+### Direct xAI through Grok CLI
 ```bash
 which grok && grok models
 ```
-Uses headless Grok Build CLI with `grok-4.5 --reasoning-effort xhigh` by default.
-Preferred auth is `XAI_API_KEY`; this is direct xAI key auth, not OpenRouter.
+Uses `grok-4.5 --reasoning-effort high`. Grok 4.5 is xAI's frontier model,
+and high is the largest effort supported by the current Grok CLI. Preferred
+auth is
+`XAI_API_KEY`; this is direct xAI key auth, not OpenRouter.
 See [`grok-integration.md`](grok-integration.md).
 
 ### Pi (primary when host=codex, otherwise when earlier external paths fail)
@@ -51,11 +64,10 @@ Uses headless Pi with this default model chain:
 ```bash
 xai-oauth/grok-4.5 --thinking xhigh
 opencode-go/glm-5.2:high
-moonshotai/kimi-k2.7-code-highspeed
+moonshotai/kimi-k3:xhigh
 ```
 
-The first model is called as `pi -p --mode text --no-tools --no-session --model xai-oauth/grok-4.5 --thinking xhigh`. The `default` token is still supported as an explicit override, and then Pi is called without `--model`, so Pi's own configured provider, model, and thinking level decide that attempt. The Moonshot leg is direct
-Moonshot API via Pi provider `moonshotai`; it is not OpenRouter.
+The first model is called as `pi -p --mode text --no-tools --no-session --model xai-oauth/grok-4.5 --thinking xhigh`. The `default` token is still supported as an explicit override, and then Pi is called without `--model`, so Pi's own configured provider, model, and thinking level decide that attempt. The Moonshot leg is Kimi K3 xhigh through direct Moonshot API via Pi provider `moonshotai`; it is not OpenRouter. When the detected host is Grok, the script forces the non-xAI suffix only, GLM followed by Kimi, so Grok never reviews Grok through Pi.
 
 See [`pi-integration.md`](pi-integration.md). The call must stay in the caller's
 repo/worktree root on this machine because the opencode-go key can resolve
@@ -68,19 +80,21 @@ which claude
 Auth is managed by the Claude desktop / `claude login` flow. `claude -p`
 fails fast if not authenticated.
 
-## Gemini via Antigravity CLI (used by all directions when earlier paths fail)
+## Antigravity model ladder
 
 ### Detection
 ```bash
 command -v agy || test -x "$HOME/.local/bin/agy"
 ```
 
-Antigravity owns Gemini auth and model selection. This plugin does not call the
-standalone `gemini` CLI.
+The plugin first runs `agy models`, then tries the best configured model that
+is listed. The default ladder crosses Claude, Gemini, and GPT providers. A
+quota or call failure advances to the next candidate. The standalone `gemini`
+CLI is never used.
 
 ### Invocation
 ```bash
-agy --print --print-timeout "${ADVERSARIAL_REVIEW_TIMEOUT:-300}s" --sandbox "$prompt"
+agy -p "$prompt" --print-timeout "${ADVERSARIAL_REVIEW_TIMEOUT:-300}s" --model "$model" --sandbox
 ```
 
 ## Degraded mode
@@ -119,10 +133,11 @@ because Antigravity does not host this skill.
 
 ## Cleanup
 
-Operational logs are appended to `/tmp/call-external-codex.err`,
-`/tmp/call-external-claude.err`, `/tmp/call-external-grok.err`,
-`/tmp/call-external-pi.err`, and `/tmp/call-external-antigravity.err`. Delete
-to rotate. The script does not auto-rotate; persistence by design.
+Operational logs are appended under
+`${XDG_STATE_HOME:-$HOME/.local/state}/adversarial-review/`, in `codex.err`,
+`claude.err`, `grok.err`, `pi.err`, and `antigravity.err`. The directory is
+restricted to the current user. Delete the files to rotate. The script does
+not auto-rotate; persistence is intentional.
 
 ## What this chain does NOT do
 

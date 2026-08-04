@@ -1,7 +1,7 @@
 ---
 name: adversarial-review
-description: "Cross-host adversarial review of any artifact — implementation plans, code/diffs/configs, or prompts/skill definitions. Classifies the input by context, then routes the heavy critique to the agent that is NOT the host (Codex from Claude, Pi chain from Codex, etc.), cross-validates against independent host-side analysis, and returns unified critics with severity ratings and a verdict. Prompts are analyzed host-side across 6 dimensions. Falls back to Gemini via Antigravity, then degraded host-self with explicit warning."
-version: 0.7.0
+description: "Cross-host adversarial review of implementation plans, code/diffs/configs, or prompts/skill definitions. Classifies the artifact, routes the heavy critique to the agent that is NOT the host, cross-validates against independent host-side analysis, and returns material findings with severity and a verdict. Plan/code reviews include a mandatory over-engineering, YAGNI, and in-repo reuse counterfactual. Prompts are analyzed host-side across 6 dimensions. Provider routing includes Moonshot Kimi K3, direct-xAI Grok 4.5 high, and Gemini 3.6 Flash High first in the Antigravity ladder before explicit degraded mode."
+version: 0.9.2
 model: inherit
 allowed-tools: ["Read", "Grep", "Glob", "Bash"]
 triggers:
@@ -44,6 +44,10 @@ Your job is to **break confidence** in the artifact, not to validate it.
 - **Finding bar**: report only material findings. No style, naming, low-value
   cleanup, or speculation without evidence. Prefer **one strong finding** over
   several weak ones. If it looks safe, say so and return no findings.
+- **Unnecessary complexity can be part of the material risk surface**: for every
+  plan/code review, hold required behavior and safety fixed, then challenge
+  speculative layers, false seams, duplicated ownership, and unused
+  flexibility. Treat line count and framework choice as clues, never verdicts.
 - Each finding must answer:
   1. What can go wrong?
   2. Why is this path vulnerable?
@@ -74,17 +78,40 @@ own pass. Still report any other **material** issue you can defend — focus is 
 priority hint, not a blindfold. Pass focus into the templates as `{FOCUS_TEXT}`
 (use `none` when absent).
 
+### Simplicity evidence preflight (plan and code)
+
+When the artifact targets a repository, use targeted `Grep` / `Glob` before
+dispatch: search exact changed symbols, capability/domain terms, and the names
+of new modules, hooks, flags, adapters, or seams. Treat the repository as an
+Effect codebase only when its manifests or imports establish that. Then search
+for existing Effect functions, Services, and Layers that own the same concern.
+Include only relevant path/line evidence and short excerpts in the partner
+prompt. Absence of a match is not proof; never claim duplicate ownership without
+a concrete existing owner. Without repository access, review only the artifact
+and do not claim missed in-repo reuse.
+
 ## Cross-host principle (plan and code reviews)
 
-- Host **Claude Code** → external is **Codex**, then **Grok Build CLI
-  (Grok 4.5 xhigh)**, then **Pi model chain**
+- Host **Claude Code** → order depends on the artifact (user decision
+  2026-07-11, wired via `ADVERSARIAL_REVIEW_ARTIFACT`):
+  - **Code/diff/config review** (`ADVERSARIAL_REVIEW_ARTIFACT=code`, the
+    script's default): **direct xAI via Grok CLI** first, using `grok-4.5`
+    at high, then **Codex (GPT-5.6 Luna, max)**, then **Pi model chain**.
+    The diff under review is normally
+    Codex-authored, so Codex reviewing it would be same-family; Grok keeps
+    the cross-family property.
+  - **Plan review** (`ADVERSARIAL_REVIEW_ARTIFACT=plan`): **Codex (GPT-5.6
+    Luna, max)** first,
+    then **direct xAI via Grok CLI**, then **Pi model chain**. Plans are
+    architect(Claude)-authored, so Codex is the cross-family reviewer there.
 - Host **Codex** → external is **Pi model chain** starting with Pi xAI OAuth
-  Grok 4.5 (`xai-oauth/grok-4.5` with `--thinking xhigh`), then Pi fallbacks, then
-  **Claude (Opus, xhigh)**, then **Grok Build CLI**
-- Host **Grok Build CLI** → **Codex**, then **Claude (Opus, xhigh)**, then
-  **Pi model chain**. Never Grok itself
-- Host **Pi** → **Codex**, then **Claude (Opus, xhigh)**, then **Grok Build
-  CLI**. Never Pi itself
+  Grok 4.5 (`xai-oauth/grok-4.5` with `--thinking xhigh`), then GLM, then
+  direct Moonshot Kimi K3 xhigh, then **Claude (Opus, xhigh)**, then direct xAI
+  via Grok CLI
+- Host **Grok Build CLI** → **Codex (GPT-5.6 Luna, max)**, then **Claude (Opus, xhigh)**, then
+  **non-xAI Pi chain** (GLM, then direct Moonshot Kimi K3 xhigh). Never Grok itself
+- Host **Pi** → **Codex (GPT-5.6 Luna, max)**, then **Claude (Opus, xhigh)**,
+  then **direct xAI via Grok CLI**. Never Pi itself
 - All externals unavailable → **DEGRADED MODE**: host self-review with explicit
   banner. Never silently auto-review.
 
@@ -92,7 +119,9 @@ priority hint, not a blindfold. Pass focus into the templates as `{FOCUS_TEXT}`
 
 On this machine/user setup, programmatic non-interactive Claude CLI use is
 standing-approved for this skill. Do not re-ask solely to call `claude -p` as
-the external reviewer from Codex/Grok hosts. Scope: review-only critique — it
+the external reviewer from Codex/Grok hosts. The invocation uses `--bare` and
+`--tools ""`, so the reviewer receives only the supplied prompt and has no tool
+access. Scope: review-only critique. It
 does not authorize code edits, git writes, issue/PR mutations, deployments,
 credential changes, or broader machine control. Still honor any per-turn user
 constraints such as requested model, effort, timeout, or read-only limits.
@@ -100,10 +129,12 @@ constraints such as requested model, effort, timeout, or read-only limits.
 ## Calling the external partner
 
 Pipe the prompt into `lib/call-external.sh` (handles host detection, routing,
-anti-recursion, Gemini-via-Antigravity fallback, degraded mode):
+anti-recursion, the Antigravity model ladder, and degraded mode):
 
 ```bash
-echo "$PROMPT" | bash "$PLUGIN_DIR/lib/call-external.sh"
+# ARTIFACT comes from Step 0: "plan" for plan reviews, "code" for
+# code/diff/config reviews (also the safe default when mixed/ambiguous).
+echo "$PROMPT" | ADVERSARIAL_REVIEW_ARTIFACT="$ARTIFACT" bash "$PLUGIN_DIR/lib/call-external.sh"
 echo "exit=$?"
 ```
 
@@ -112,19 +143,30 @@ echo "exit=$?"
 - Do **not** call `codex exec`, `claude -p`, `grok -p`, or `pi -p` directly —
   always go through `lib/call-external.sh` (anti-recursion via
   `ADVERSARIAL_REVIEW_DEPTH`).
-- Grok external defaults to `grok-4.5` with `--reasoning-effort xhigh` via Grok CLI, auth by
-  inherited `XAI_API_KEY`. Override model via `ADVERSARIAL_REVIEW_GROK_MODEL`
-  and effort via `ADVERSARIAL_REVIEW_GROK_EFFORT`.
+- Direct xAI via Grok CLI defaults to the model `grok-4.5`, authenticated by
+  inherited `XAI_API_KEY`. The script checks `grok models`, skips unavailable
+  entries, and uses high, the highest effort accepted by the current Grok CLI.
+  Grok 4.5 is xAI's frontier model. Override the chain via
+  `ADVERSARIAL_REVIEW_GROK_MODELS`; the singular
+  `ADVERSARIAL_REVIEW_GROK_MODEL` remains a back-compat override.
+- Codex external is pinned to `gpt-5.6-luna` with
+  `-c model_reasoning_effort=max`, independently of the interactive Codex
+  default. Model and effort are intentionally not overridable: this route is
+  review-only and always uses `--sandbox read-only`.
 - Pi model chain default: `xai-oauth/grok-4.5` with `--thinking xhigh`,
-  `opencode-go/glm-5.2:high`, `moonshotai/kimi-k2.7-code-highspeed` (Moonshot
-  direct via `MOONSHOT_API_KEY`). Override via `ADVERSARIAL_REVIEW_PI_MODELS`.
+  `opencode-go/glm-5.2:high`, `moonshotai/kimi-k3:xhigh` (Moonshot direct via
+  `MOONSHOT_API_KEY`). Override via `ADVERSARIAL_REVIEW_PI_MODELS`.
   Override the Pi thinking flag via `ADVERSARIAL_REVIEW_PI_THINKING`; default
   is `xhigh` for the first explicit model token without a `:level` suffix.
   Do not move the call to `/tmp` — Doppler-scoped opencode-go credentials
   resolve from the current directory.
-- Gemini fallback runs only through non-interactive Antigravity CLI:
-  `agy --print --print-timeout "${ADVERSARIAL_REVIEW_TIMEOUT:-300}s" --sandbox`.
-  Never the standalone `gemini` CLI.
+- Antigravity fallback discovers models with `agy models`, then tries a
+  quality-first cross-provider ladder. The default starts with Gemini 3.6
+  Flash High, then Claude Opus 4.6 Thinking, Gemini 3.1 Pro High, Claude Sonnet
+  4.6, GPT OSS 120B Medium, and Gemini 3.6 Flash Medium. A failed quota or call advances
+  to the next listed model. Override via
+  `ADVERSARIAL_REVIEW_ANTIGRAVITY_MODELS`. Never use the standalone `gemini`
+  CLI.
 - Exit `1` (recursion): you are inside a partner-launched call — emit a short
   note ("recursion guard tripped - parent already running review") and stop.
 - Input over ~6 kB: summarize sections / focus the diff on changed regions —
@@ -151,8 +193,15 @@ Attack the plan for:
 4. Rollback / partial failure — what if step N fails mid-way? Reversible?
 5. Blast radius — what existing functionality dies if this ships wrong?
 6. Success criteria — verifiable completion conditions, or vibes?
-7. Cost / complexity — files touched, migration risk, test impact understated?
+7. Delivery-cost underestimation: migration, rollout, test, and operational
+   impact understated?
 8. Assumptions that stop being true under load, empty state, or multi-tenant use.
+9. Over-engineering / YAGNI: holding required behavior and safety fixed, could
+   the plan use fewer concepts, layers, files, or configuration surfaces? Is
+   each new seam justified by a current caller/adapter? Does an existing
+   in-repo module, including a canonical Effect implementation, already own the
+   concern? Treat fewer lines as a clue, never a target; do not introduce Effect
+   unless repo standards or existing ownership already call for it.
 
 Finding bar: material only. Each finding answers: what fails, why the plan is
 vulnerable, impact, concrete change. Prefer one strong finding over many weak
@@ -205,6 +254,22 @@ Also cover classic failure classes when material:
 - CORRECTNESS: off-by-one, type confusion, null paths, timezone/locale, overflow
 - SUPPLY CHAIN: pins, lockfile, typo-squat — only if evidence in the change
 
+Also run a simplicity counterfactual (material only; hold required behavior and
+safety fixed):
+- Could the same change use fewer concepts, layers, entry points, or
+  configuration surfaces?
+- Is every new abstraction, type, hook, flag, adapter, and seam required by the
+  current spec or a verified caller?
+- If a new layer were deleted, would complexity reappear across callers, or
+  simply vanish as pass-through / middle-man code? Is a second adapter real or
+  hypothetical?
+- Does an existing in-repo module already own this concern or logic shape? If a
+  canonical Effect implementation exists, call or extend it instead of creating
+  parallel ownership.
+- Could materially fewer lines expose duplication or unnecessary machinery?
+  LOC is only a clue. Never trade away tests, error handling, observability, or
+  required behavior, and do not introduce Effect solely to satisfy this check.
+
 Method: actively try to disprove the change. Trace bad inputs, retries,
 concurrent actions, and partial completion through the code. Weight the user
 focus heavily, but still report any other material issue you can defend.
@@ -218,6 +283,12 @@ Finding bar — each finding must answer:
 Report only material findings. No style, naming, low-value cleanup, or
 speculation without evidence. Prefer one strong finding over several weak ones.
 If the change looks safe, say so directly and return no findings.
+
+For over-engineering findings, name the unrequired concept/layer or duplicate
+owner, cite a path/line or plan section plus current-spec/caller/reuse evidence,
+state the material failure, maintenance cost, or risk, and give a concrete
+simpler alternative that preserves required behavior and safety. "Could use
+fewer lines" or "Effect would be cleaner" alone is not a finding.
 
 Grounding: every finding must be defensible from the provided context. Do not
 invent files, lines, incidents, or runtime behavior. Mark inferences and keep
@@ -251,7 +322,7 @@ Unified output header (both procedures):
 ```markdown
 ## Adversarial Review — <Plan | Code>
 
-- **Mode**: <external=codex | external=claude-opus | external=grok-4.5-xhigh | external=pi-grok-4.5-xhigh | external=pi-* | external=antigravity-gemini | DEGRADED>
+- **Mode**: <external=codex-luna-max | external=claude-opus | external=direct-xai-* | external=pi-grok-4.5-xhigh | external=pi-* | external=antigravity-* | DEGRADED>
 - **Target**: <working tree | branch vs base | file | pasted artifact>
 - **Focus**: <user focus or none>
 - **Verdict**: <see procedure>
@@ -283,6 +354,10 @@ poor hierarchy, front/back-loading).
 Apply the same material-only finding bar: no cosmetic rewrites without a
 defensible failure mode.
 
+Run the analogous simplicity counterfactual for prompts: can the same behavior
+be preserved with fewer duplicated rules, layers of indirection, or special
+cases? Shorter is a clue, not the goal.
+
 Modes: **A Critique** ("critique this prompt") → issue list only, ≤800 tokens.
 **B Optimize** (default) → issues + optimized version + diff + change log,
 ≤1500 tokens. **C Compare** (two inputs) → side-by-side scoring table +
@@ -303,8 +378,8 @@ Output per finding: `[P0-P3] [dimension]: title` + evidence (quote) + problem
 - `references/codex-integration.md` — Codex CLI invocation, incl. the
   `forced_login_method = "chatgpt"` gotcha
 - `references/claude-integration.md` — `claude -p --model opus --effort xhigh`
-- `references/grok-integration.md` — `grok -p -m grok-4.5 --reasoning-effort xhigh`
-- `references/pi-integration.md` — Pi model chain
-- `references/antigravity-integration.md` — Gemini via Antigravity CLI
-- `references/fallback-chain.md` — full external chain + degraded path
-- `references/output-standards.md` — P0-P3 schema, evidence requirements
+- `references/grok-integration.md`: direct-xAI model discovery and fallback
+- `references/pi-integration.md`: Pi model chain, including Moonshot Kimi K3
+- `references/antigravity-integration.md`: multi-provider model ladder
+- `references/fallback-chain.md`: full external chain and degraded path
+- `references/output-standards.md`: P0-P3 schema and evidence requirements

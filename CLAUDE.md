@@ -1,17 +1,25 @@
 # CLAUDE.md - Claude Code directives
 
-## Plugin: adversarial-review v0.7.0
+## Plugin: adversarial-review v0.9.2
 
 Cross-host adversarial review for coding workflows. Detects which agent host
-the SKILL.md is running under and routes review to the OTHER agent: Codex if
-the host is Claude Code, Pi xAI OAuth Grok 4.5 with xhigh thinking first if the host is Codex,
-Codex/Claude if the host is Grok Build CLI, with Claude, Grok 4.5 xhigh, and the
-Pi model chain as secondary externals. Falls back to Gemini via
-non-interactive Antigravity CLI, then degraded host-self with explicit warning.
+the SKILL.md is running under and routes review to another model family. Claude
+code reviews use direct-xAI Grok 4.5 first, while Claude plan reviews use Codex
+Luna first. Codex uses the Pi chain first. Grok and Pi use Codex first. Each
+route has explicit secondary providers, then a quality-first Antigravity
+Claude, Gemini, and GPT ladder, then degraded host-self with explicit warning.
 
-v0.7 hardens critique discipline (Codex Companion lessons): break-confidence
-stance, expensive attack surface first, material-only finding bar, steerable
-focus, terse ship/no-ship summary. See `references/codex-lessons.md`.
+v0.9.2 changes the Luna reviewer effort to max. v0.9.1 makes Gemini 3.6 Flash High the first Antigravity candidate. Routing
+policy 2026-07-23 makes Grok 4.5, xAI's frontier model, the sole direct-xAI
+model at high effort. v0.9.0 routes direct Moonshot review to Kimi K3 xhigh
+and adds quota-aware Antigravity failover across providers. v0.8.2 pinned every Codex reviewer
+invocation to GPT-5.6 Luna with read-only sandboxing.
+v0.8.1 added a mandatory simplicity
+counterfactual to plan and code reviews:
+hold required behavior and safety fixed, then challenge YAGNI, false seams,
+duplicate ownership, missed in-repo reuse, and unnecessary machinery. Existing
+canonical Effect implementations count as reuse evidence; Effect and lower LOC
+are never goals by themselves.
 
 ## Architecture
 
@@ -40,21 +48,26 @@ focus, terse ship/no-ship summary. See `references/codex-lessons.md`.
 - **Global gitignore** at `~/.config/git/ignore` blocks `.claude/settings.local.json` -
   use `git add -f` to include it.
 - **Codex CLI** needs `--sandbox read-only` for review (we never want writes
-  during a critique pass) and `--skip-git-repo-check` since the prompt is the
-  unit of review.
-- **Grok CLI** is pinned to `grok-4.5` with `--reasoning-effort xhigh` for the Grok leg.
-  Preferred auth is inherited `XAI_API_KEY`; `grok models` should list `grok-4.5`.
-  This is direct xAI key auth, not OpenRouter.
+  during a critique pass), `-m gpt-5.6-luna`,
+  `-c model_reasoning_effort=max`, and `--skip-git-repo-check` since the
+  prompt is the unit of review.
+- **Direct xAI through Grok CLI** uses `grok-4.5` with
+  `--reasoning-effort high`. Grok 4.5 is xAI's frontier model, and high is the
+  largest effort the current Grok CLI accepts.
+  The script checks `grok models` and skips unavailable entries. Preferred auth
+  is inherited
+  `XAI_API_KEY`; this is not OpenRouter.
 - **Pi model chain** uses `pi -p --mode text --no-tools --model` for the
   default explicit chain. Run it from the caller's repo/worktree root. Default
   order: `xai-oauth/grok-4.5` with `--thinking xhigh`, `opencode-go/glm-5.2:high`,
-  `moonshotai/kimi-k2.7-code-highspeed`. The Moonshot leg is direct API via
+  `moonshotai/kimi-k3:xhigh`. The Moonshot leg is direct API via
   `MOONSHOT_API_KEY`, not OpenRouter. The `default` token is still accepted as
   an override when the caller wants Pi's configured default. Do not run it from
   `/tmp` when opencode-go keys resolve through Doppler scope.
-- **Gemini fallback** uses Antigravity CLI non-interactively:
-  `agy --print --print-timeout "${ADVERSARIAL_REVIEW_TIMEOUT:-300}s" --sandbox`.
-  Do not use the standalone `gemini` CLI for this fallback.
+- **Antigravity fallback** runs `agy models`, filters a quality-first ladder,
+  and tries available Claude, Gemini, and GPT models in order. Each call pins
+  `--model`; quota or call failure advances to the next candidate. Do not use
+  the standalone `gemini` CLI for this fallback.
 - **Long prompts (>~6 kB) can stall Codex backend.** SKILLs should summarize
   rather than paste raw if the input is huge. Verified empirically - a single
   meta-review prompt with a 200+ line plan stalled `codex exec` for 20+ min
