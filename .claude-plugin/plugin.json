@@ -1,7 +1,7 @@
 {
   "name": "adversarial-review",
-  "version": "0.7.0",
-  "description": "Cross-host adversarial review for coding workflows. Breaks confidence in plans/code via partner routing (never silent self-review). Codex if you're in Claude Code; Pi xAI OAuth Grok 4.5 xhigh first if you're in Codex. Material-only findings, expensive attack surfaces first. Falls back through Claude, Grok, Gemini via Antigravity, then degraded host-self with explicit warning.",
+  "version": "0.9.2",
+  "description": "Cross-host adversarial review for coding workflows. Material-only findings include over-engineering and missed reuse. Provider routing uses Codex GPT-5.6 Luna max, direct Moonshot Kimi K3 xhigh, direct-xAI Grok 4.5 high, and Gemini 3.6 Flash High first in the Antigravity ladder.",
   "author": {
     "name": "Roberto",
     "email": "robertoecf@gmail.com"

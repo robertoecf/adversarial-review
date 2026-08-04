@@ -4,7 +4,8 @@
 
 Claude CLI is the Codex-host fallback after Pi fails. The skill sends
 the wrapped prompt through `lib/call-external.sh`, which detects the host and
-(if codex and Pi failed) shells out to `claude -p --model opus --effort xhigh`.
+(if codex and Pi failed) shells out to `claude -p --model opus --effort xhigh`
+in bare, prompt-only mode with no tools.
 
 For the full chain (claude -> grok -> pi/opencode-go -> Antigravity -> degraded), see
 [`fallback-chain.md`](fallback-chain.md). For host detection, see
@@ -34,9 +35,12 @@ rather than hang.
 claude -p \
   --model opus \
   --effort xhigh \
+  --bare \
+  --tools "" \
   --dangerously-skip-permissions \
   "<prompt>" \
-  2>>err.log
+  2>>err.log \
+  </dev/null
 ```
 
 Why `--model opus`:
@@ -49,8 +53,13 @@ Why `--effort xhigh`:
 
 Why `--dangerously-skip-permissions`:
 - `claude -p` runs non-interactively; permission prompts cannot be answered.
-- The prompt itself is treated as user input (trusted); review is read-only
-  in spirit, the flag avoids interactive deadlock.
+- `--tools ""` removes tool access, so this flag cannot authorize file, shell,
+  network, or repository actions. It only avoids an interactive deadlock.
+
+Why `--bare --tools ""`:
+- `--bare` skips hooks, plugins, and auto-memory.
+- The reviewer receives only the supplied prompt and cannot inspect the current
+  directory or inherited environment through tools.
 
 Why `-p` (print mode):
 - Synchronous subprocess; stdout = final response, exit code = success/fail.
@@ -63,6 +72,7 @@ Why `-p` (print mode):
 | `--model <name>`                        | `opus` / `sonnet` / specific version             |
 | `--effort <level>`                      | `low` / `medium` / `high` / `xhigh` / `max`      |
 | `--dangerously-skip-permissions`        | Skip approval prompts (required for `-p`)        |
+| `--tools ""`                            | Disable all Claude tools                          |
 | `--add-dir <path>...`                   | Grant access to additional dirs (for context)    |
 | `--append-system-prompt <text>`         | Add to default system prompt                     |
 | `--bare`                                | Minimal mode - skip hooks, plugins, auto-memory  |
@@ -77,17 +87,16 @@ review"), the recursion guard in `call-external.sh` refuses (exit 1). See
 
 ## Cleanup
 
-`lib/call-external.sh` writes operational logs to `/tmp/call-external-claude.err`.
-That file persists by design - useful for debugging. To rotate, just delete it.
+`lib/call-external.sh` writes operational logs to
+`${XDG_STATE_HOME:-$HOME/.local/state}/adversarial-review/claude.err`. The
+parent directory is restricted to the current user. The file persists for
+debugging; delete it to rotate.
 
 ## What this plugin does NOT do
 
-- **Does not load CLAUDE.md from the user's repo by default.** `claude -p`
-  with no `--add-dir` only sees the current working directory. If the prompt
-  needs access to other dirs (worktrees, sibling repos), the skill should
-  pass them via `--add-dir <path>` - but `lib/call-external.sh` does not do
-  this automatically. SKILLs that need multi-dir context should construct the
-  call themselves or ask the user.
+- **Does not load repository context or CLAUDE.md.** `--bare --tools ""`
+  makes the reviewer prompt-only. Callers must include every relevant excerpt
+  in the prompt.
 - **Does not preserve conversation state.** Each `claude -p` is a fresh
   session. State that needs to persist across calls lives in
-  `~/.claude/projects/<cwd>/memory/` (auto-memory).
+  the caller's own state; bare mode disables auto-memory.

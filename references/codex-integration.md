@@ -4,7 +4,8 @@
 
 Codex CLI is the **external partner** when the host is Claude Code. The skill
 sends the wrapped prompt through `lib/call-external.sh`, which detects the host
-and (if claude) shells out to `codex exec --sandbox read-only`.
+and, when Codex is selected, shells out to `codex exec` with GPT-5.6 Luna,
+max reasoning, and a read-only sandbox.
 
 For the full chain (codex -> grok -> pi/opencode-go -> Antigravity -> degraded), see
 [`fallback-chain.md`](fallback-chain.md). For host detection, see
@@ -18,6 +19,9 @@ For the full chain (codex -> grok -> pi/opencode-go -> Antigravity -> degraded),
 - **Config**: `~/.codex/config.toml` (see "Required config" below)
 - **Sandbox**: `--sandbox read-only` in this plugin (we never want Codex
   modifying files during review)
+- **Reviewer model**: `gpt-5.6-luna`, pinned independently of the interactive
+  Codex model
+- **Reviewer effort**: `max`
 
 ## Required config - `forced_login_method`
 
@@ -44,6 +48,9 @@ ChatGPT subscription endpoint that includes the configured model in its
 catalog (the original 404 above was hit with `gpt-5.4`).
 Tracking issues that surfaced this: openai/codex#14266, #14190, #11927.
 
+The interactive config may remain on `gpt-5.6-sol`. The plugin overrides only
+the external reviewer invocation to `gpt-5.6-luna` with max reasoning.
+
 If you only have an OpenAI API key (no ChatGPT subscription), instead set
 `OPENAI_API_KEY` and skip `forced_login_method`.
 
@@ -56,7 +63,8 @@ which codex && test -f ~/.codex/auth.json && echo "CODEX_OK" || echo "NO_CODEX"
 ## Invocation pattern (used by `lib/call-external.sh`)
 
 ```bash
-codex exec --sandbox read-only --skip-git-repo-check "<prompt>" 2>>err.log
+codex exec -m gpt-5.6-luna -c model_reasoning_effort=max \
+  --sandbox read-only --skip-git-repo-check "<prompt>" 2>>err.log
 ```
 
 Why `--sandbox read-only`:
@@ -78,7 +86,7 @@ Why no `--full-auto`:
 | `-s, --sandbox <MODE>`     | `read-only` (this plugin) / `workspace-write` / `danger-full-access` |
 | `--skip-git-repo-check`    | Don't refuse if cwd isn't a git repo                      |
 | `-c key=value`             | Override config (e.g. `-c forced_login_method=chatgpt`)   |
-| `-m, --model`              | Override model (default from config)                      |
+| `-m, --model`              | `gpt-5.6-luna` for this reviewer                          |
 | `--ephemeral`              | Don't persist session files (overlapping with sandbox)    |
 | `-o <file>`                | Write final agent message to file (alternative to stdout) |
 | `--json`                   | JSONL event stream (cc-connect uses this)                 |
@@ -92,8 +100,10 @@ refuses (exit 1). See `host-detection.md` for the full anti-recursion chain.
 
 ## Cleanup
 
-`lib/call-external.sh` writes operational logs to `/tmp/call-external-codex.err`.
-That file persists by design - useful for debugging. To rotate, just delete it.
+`lib/call-external.sh` writes operational logs to
+`${XDG_STATE_HOME:-$HOME/.local/state}/adversarial-review/codex.err`. The parent
+directory is restricted to the current user. The file persists for debugging;
+delete it to rotate.
 
 ## What this plugin does NOT do
 

@@ -1,13 +1,33 @@
 # adversarial-review
 
-**v0.7.0** — Cross-host adversarial review for coding workflows. Works in
+**v0.9.2**: Cross-host adversarial review for coding workflows. Works in
 **Claude Code, Codex, Pi, and Grok** from the same source: detects which agent
 host you're running in and routes the heavy critique to the OTHER agent.
 
-Critique discipline (v0.7): break confidence rather than validate; expensive
-attack surfaces first; material-only findings; steerable focus; terse
-ship/no-ship summary. Lessons adapted from OpenAI Codex Companion — see
-`references/codex-lessons.md`.
+Critique discipline (v0.8.1): break confidence rather than validate; expensive
+attack surfaces first; material-only findings; mandatory simplicity
+counterfactuals; steerable focus; terse ship/no-ship summary. Lessons adapted
+from OpenAI Codex Companion and Matt Pocock's engineering skills.
+
+Version note: v0.9.2 changes the Luna reviewer effort to max. v0.9.1 makes Gemini 3.6 Flash High the first Antigravity model,
+with provider and quota fallthrough unchanged. Routing policy 2026-07-23
+makes Grok 4.5, xAI's frontier model, the sole direct-xAI model at high effort.
+v0.9.0 moved the direct Moonshot leg to Kimi K3 xhigh and made Antigravity
+choose from a quality-first Claude, Gemini, and GPT ladder with quota fallback.
+v0.8.2 pinned the Codex reviewer; v0.9.2 now uses max effort.
+
+## Simplicity counterfactual
+
+Every plan and code review now asks whether the same required behavior and
+safety can be delivered with fewer concepts, layers, seams, entry points, or
+configuration surfaces. It checks YAGNI, pass-through layers, hypothetical
+adapters, duplicate ownership, and missed reuse of existing in-repo modules.
+
+Effect is conditional, not a framework preference: when the repository already
+has a canonical Effect implementation for the concern, the reviewer challenges
+a parallel implementation. It does not recommend introducing Effect merely to
+reduce line count or enforce framework consistency. Fewer lines are a clue,
+never the verdict.
 
 ## The principle
 
@@ -21,14 +41,20 @@ highest-value findings - the ones a single reviewer would miss.
 This plugin enforces that principle automatically:
 
 - Running in **Claude Code** -> external reviewer is **Codex** (`codex exec`,
-  `gpt-5.6-sol xhigh` via ChatGPT subscription auth)
+  `gpt-5.6-luna max` via ChatGPT subscription auth) for plans, with Grok first
+  for code/diff reviews
 - Running in **Codex** -> external reviewer is **Pi xAI OAuth Grok 4.5 with xhigh thinking**
-  first, then **Claude (Opus, xhigh)** via `claude -p`, then Grok Build CLI
-  with `grok-4.5 --reasoning-effort xhigh`
-- Running in **Claude Code** fallback order after Codex is Grok Build CLI,
-  then Pi model chain (`xai-oauth/grok-4.5` with `--thinking xhigh`, `opencode-go/glm-5.2:high`,
-  `moonshotai/kimi-k2.7-code-highspeed` direct API), then Gemini via
-  non-interactive Antigravity CLI (`agy --print`)
+  first, then **Claude (Opus, xhigh)** via `claude -p`, then the Grok CLI
+  through direct xAI using `grok-4.5 --reasoning-effort high`. Grok 4.5 is
+  xAI's frontier model, and high is the largest current Grok CLI tier
+- Running in **Grok** -> external reviewer is **Codex Luna max**, then
+  **Claude (Opus, xhigh)**, then a non-xAI Pi chain using GLM followed by
+  direct Moonshot Kimi K3 xhigh
+- Running in **Claude Code** plan review uses Codex, direct-xAI Grok, then the
+  Pi model chain. Code/diff review uses direct-xAI Grok, Codex, then the Pi
+  model chain (`xai-oauth/grok-4.5` with `--thinking xhigh`,
+  `opencode-go/glm-5.2:high`, `moonshotai/kimi-k3:xhigh` direct API). Both paths
+  then use the quality-first Antigravity ladder (`agy -p "$prompt" --model ...`)
 - Everything unavailable -> **degraded mode** with explicit banner: the host
   reviews itself, but the user is told the cross-host principle was bypassed
 
@@ -42,9 +68,9 @@ SKILL.md (same file in both hosts)
    │     ├─ lib/detect-host.sh  (override -> env -> PPID walk)
    │     ├─ partner = NOT host
    │     ├─ ADVERSARIAL_REVIEW_DEPTH = 1  (anti-recursion guard)
-   │     ├─ try partner (codex exec OR claude -p)
-   │     ├─ on fail -> grok, then pi/opencode-go
-   │     ├─ on fail -> Gemini via Antigravity
+   │     ├─ select ordered partners from host + artifact
+   │     ├─ try Codex, Claude, direct xAI, or Pi in that route's order
+   │     ├─ on fail -> quality-first Antigravity ladder
    │     └─ on fail -> degraded mode (exit 2)
    │
    ├─ host runs its own independent analysis (no peeking at partner output)
@@ -173,7 +199,7 @@ $adversarial-review review my changes: ...
 - `references/codex-integration.md` - Codex CLI specifics + `forced_login_method` gotcha
 - `references/claude-integration.md` - `claude -p --model opus --effort xhigh`
 - `references/pi-integration.md` - Pi model chain
-- `references/antigravity-integration.md` - Gemini through non-interactive Antigravity CLI
+- `references/antigravity-integration.md` - quality-first Claude, Gemini, and GPT ladder through non-interactive Antigravity CLI
 - `references/fallback-chain.md` - external chain + Antigravity + degraded path
 - `AGENTS.md` - agent-side rules (severity, honesty, anti-recursion contract)
 - `CLAUDE.md` - Claude Code dev workflow

@@ -5,14 +5,14 @@
     "email": "robertoecf@gmail.com"
   },
   "metadata": {
-    "description": "Cross-host adversarial review for coding workflows. Routes review to whichever agent is NOT the host - Codex if you're in Claude Code, Pi xAI OAuth Grok 4.5 xhigh first if you're in Codex.",
-    "version": "0.7.0"
+    "description": "Cross-host adversarial review with Codex GPT-5.6 Luna max, Moonshot Kimi K3, direct-xAI Grok 4.5 high, and Gemini 3.6 Flash High as the Antigravity default.",
+    "version": "0.9.2"
   },
   "plugins": [
     {
       "name": "adversarial-review",
-      "description": "Cross-host adversarial review. Break-confidence stance, material-only findings. Detects host and routes review to the partner agent. Fallback cascade: host-specific primary -> secondary partners with Grok 4.5 xhigh / Pi Grok 4.5 xhigh -> Antigravity Gemini -> degraded host-self with explicit warning.",
-      "version": "0.7.0",
+      "description": "Cross-host adversarial review with material-only findings and mandatory over-engineering counterfactuals. Provider-aware routing uses Codex GPT-5.6 Luna max, Moonshot Kimi K3 xhigh, direct-xAI Grok 4.5 high, and Gemini 3.6 Flash High first in Antigravity.",
+      "version": "0.9.2",
       "source": "./",
       "author": {
         "name": "Roberto",

@@ -26,6 +26,20 @@ Exclude: style, naming, low-value cleanup, speculative concerns without evidence
 Calibration: prefer one strong finding over several weak ones. Clean review →
 empty blockers and an honest SHIP/PROCEED is success, not failure.
 
+For an over-engineering finding, also require:
+
+- a path/line or plan-section anchor for the concrete unrequired concept, layer,
+  seam, configuration surface, or duplicate owner;
+- evidence from the current spec, verified callers/adapters, or a cited
+  existing in-repo implementation, plus the material failure, maintenance cost,
+  or risk;
+- a concrete simpler alternative that preserves required behavior and safety.
+
+"Could use fewer lines" and "Effect would be cleaner" are clues, not findings.
+If the repository already has a canonical Effect implementation for the
+concern, duplicating that ownership is evidence; introducing Effect only for
+framework consistency is not.
+
 ## Per-Finding Template
 
 ```markdown
