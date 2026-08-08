@@ -4,7 +4,7 @@
 this default chain:
 
 1. `xai-oauth/grok-4.5` with `--thinking xhigh`
-2. `opencode-go/glm-5.2:high`
+2. `opencode-go/deepseek-v4-flash:xhigh`
 3. `moonshotai/kimi-k3:xhigh`, direct Moonshot API, not OpenRouter
 
 The first leg intentionally uses Pi's xAI OAuth provider with Grok 4.5 and
@@ -23,20 +23,29 @@ returned provider `moonshotai`, model `kimi-k3`, and thinking content.
 The direct provider uses `MOONSHOT_API_KEY`. Do not place that key in this repo
 or in review prompts.
 
+## OpenCode Go data residency
+
+As of 2026-08-08, OpenCode Go lists `deepseek-v4-flash` with thinking support
+and a 1M context window. Its latest deployment is hosted in China and requires
+explicit workspace opt-in. Without that opt-in, Pi text mode exits nonzero
+with a `RegionError`; the dispatcher logs the failed attempt and continues to
+the direct Moonshot Kimi K3 fallback. Treat the opt-in as a separate
+data-residency decision, not as part of plugin installation.
+
 ## When Pi is used
 
 | Detected host | Pi role |
 |---------------|---------|
 | `claude` | Fallback after Codex and Grok fail |
 | `codex` | Primary external reviewer. Runs before Claude and Grok |
-| `grok` | Non-xAI fallback after Codex and Claude fail. GLM then Kimi, never Grok |
+| `grok` | Non-xAI fallback after Codex and Claude fail. DeepSeek then Kimi, never Grok |
 | `pi` | Never called as external, because that would self-review |
 | `unknown` | Fallback after Grok fails |
 
 ## Invocation
 
 ```bash
-IFS=, read -r -a models <<< "${ADVERSARIAL_REVIEW_PI_MODELS:-xai-oauth/grok-4.5,opencode-go/glm-5.2:high,moonshotai/kimi-k3:xhigh}"
+IFS=, read -r -a models <<< "${ADVERSARIAL_REVIEW_PI_MODELS:-xai-oauth/grok-4.5,opencode-go/deepseek-v4-flash:xhigh,moonshotai/kimi-k3:xhigh}"
 pi_thinking="${ADVERSARIAL_REVIEW_PI_THINKING:-xhigh}"
 for model in "${models[@]}"; do
   if [ "$model" = "default" ]; then
@@ -79,7 +88,7 @@ provider, backed by `MOONSHOT_API_KEY`.
 
 | Variable | Default | Effect |
 |----------|---------|--------|
-| `ADVERSARIAL_REVIEW_PI_MODELS` | `xai-oauth/grok-4.5,opencode-go/glm-5.2:high,moonshotai/kimi-k3:xhigh` | Comma-separated Pi model chain, tried in order. The token `default` calls Pi without `--model` |
+| `ADVERSARIAL_REVIEW_PI_MODELS` | `xai-oauth/grok-4.5,opencode-go/deepseek-v4-flash:xhigh,moonshotai/kimi-k3:xhigh` | Comma-separated Pi model chain, tried in order. The token `default` calls Pi without `--model` |
 | `ADVERSARIAL_REVIEW_PI_THINKING` | `xhigh` | Pi `--thinking` level for the first explicit model token without a `:level` suffix. Set it empty to omit `--thinking` |
 | `ADVERSARIAL_REVIEW_PI_MODEL` | unset | Back-compat single model override, used only when `ADVERSARIAL_REVIEW_PI_MODELS` is unset. It may also be `default` |
 | `MOONSHOT_API_KEY` | unset | Required by Pi for the direct `moonshotai/...` fallback |
@@ -91,6 +100,7 @@ Useful discovery commands:
 
 ```bash
 pi --list-models moonshotai
+pi --list-models opencode-go
 pi --list-models kimi-k3
 ```
 
@@ -123,8 +133,8 @@ Useful model proof commands:
 pi -p --mode text --no-tools --no-session --model xai-oauth/grok-4.5 --thinking xhigh \
   'Reply exactly: PI_GROK_45_XHIGH_OK'
 
-pi -p --mode text --no-tools --no-session --model opencode-go/glm-5.2:high \
-  'Reply exactly: GLM_52_OK'
+pi -p --mode text --no-tools --no-session --model opencode-go/deepseek-v4-flash:xhigh \
+  'Reply exactly: DEEPSEEK_V4_FLASH_XHIGH_OK'
 
 MOONSHOT_API_KEY=... pi -p --mode text --no-tools --no-session \
   --model moonshotai/kimi-k3 --thinking xhigh \

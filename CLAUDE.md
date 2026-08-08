@@ -1,6 +1,6 @@
 # CLAUDE.md - Claude Code directives
 
-## Plugin: adversarial-review v0.9.2
+## Plugin: adversarial-review v0.9.3
 
 Cross-host adversarial review for coding workflows. Detects which agent host
 the SKILL.md is running under and routes review to another model family. Claude
@@ -9,7 +9,7 @@ Luna first. Codex uses the Pi chain first. Grok and Pi use Codex first. Each
 route has explicit secondary providers, then a quality-first Antigravity
 Claude, Gemini, and GPT ladder, then degraded host-self with explicit warning.
 
-v0.9.2 changes the Luna reviewer effort to max. v0.9.1 makes Gemini 3.6 Flash High the first Antigravity candidate. Routing
+v0.9.3 replaces the OpenCode Go fallback with DeepSeek V4 Flash xhigh and keeps the Luna reviewer at max effort. v0.9.1 makes Gemini 3.6 Flash High the first Antigravity candidate. Routing
 policy 2026-07-23 makes Grok 4.5, xAI's frontier model, the sole direct-xAI
 model at high effort. v0.9.0 routes direct Moonshot review to Kimi K3 xhigh
 and adds quota-aware Antigravity failover across providers. v0.8.2 pinned every Codex reviewer
@@ -59,7 +59,7 @@ are never goals by themselves.
   `XAI_API_KEY`; this is not OpenRouter.
 - **Pi model chain** uses `pi -p --mode text --no-tools --model` for the
   default explicit chain. Run it from the caller's repo/worktree root. Default
-  order: `xai-oauth/grok-4.5` with `--thinking xhigh`, `opencode-go/glm-5.2:high`,
+  order: `xai-oauth/grok-4.5` with `--thinking xhigh`, `opencode-go/deepseek-v4-flash:xhigh`,
   `moonshotai/kimi-k3:xhigh`. The Moonshot leg is direct API via
   `MOONSHOT_API_KEY`, not OpenRouter. The `default` token is still accepted as
   an override when the caller wants Pi's configured default. Do not run it from
