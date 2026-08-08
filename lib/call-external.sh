@@ -142,7 +142,7 @@ call_pi() {
     return 1
   fi
 
-  local models_csv="${ADVERSARIAL_REVIEW_PI_MODELS:-${ADVERSARIAL_REVIEW_PI_MODEL:-xai-oauth/grok-4.5,opencode-go/glm-5.2:high,moonshotai/kimi-k3:xhigh}}"
+  local models_csv="${ADVERSARIAL_REVIEW_PI_MODELS:-${ADVERSARIAL_REVIEW_PI_MODEL:-xai-oauth/grok-4.5,opencode-go/deepseek-v4-flash:xhigh,moonshotai/kimi-k3:xhigh}}"
   local pi_thinking
   if [ "${ADVERSARIAL_REVIEW_PI_THINKING+x}" = "x" ]; then
     pi_thinking="$ADVERSARIAL_REVIEW_PI_THINKING"
@@ -352,7 +352,7 @@ case "$HOST" in
     log "codex exec failed; trying claude"
     if call_claude; then exit 0; fi
     log "claude -p failed; trying non-xAI pi chain"
-    if ADVERSARIAL_REVIEW_PI_MODELS="opencode-go/glm-5.2:high,moonshotai/kimi-k3:xhigh" call_pi; then exit 0; fi
+    if ADVERSARIAL_REVIEW_PI_MODELS="opencode-go/deepseek-v4-flash:xhigh,moonshotai/kimi-k3:xhigh" call_pi; then exit 0; fi
     log "non-xAI pi chain failed; trying Antigravity model ladder"
     ;;
   pi)

@@ -26,8 +26,8 @@ files, blocking-vs-non-blocking ambiguity) without proportionate value.
 | Detected host | Partner                              |
 |---------------|--------------------------------------|
 | `claude`      | Code: direct-xAI Grok 4.5, Codex Luna max, Pi. Plan: Codex Luna max, direct-xAI Grok 4.5, Pi. Then Antigravity |
-| `codex`       | Pi chain (xAI OAuth Grok 4.5 xhigh, GLM, Moonshot Kimi K3), then Claude, direct xAI, and Antigravity |
-| `grok`        | Codex GPT-5.6 Luna max, then Claude, non-xAI Pi (GLM then Kimi), and the Antigravity ladder |
+| `codex`       | Pi chain (xAI OAuth Grok 4.5 xhigh, OpenCode Go DeepSeek V4 Flash xhigh, Moonshot Kimi K3), then Claude, direct xAI, and Antigravity |
+| `grok`        | Codex GPT-5.6 Luna max, then Claude, non-xAI Pi (DeepSeek then Kimi, never Grok), and the Antigravity ladder |
 | `pi`          | Codex GPT-5.6 Luna max, then Claude, direct xAI, and the Antigravity ladder |
 | `unknown`     | Direct xAI, then Pi, then the Antigravity ladder |
 

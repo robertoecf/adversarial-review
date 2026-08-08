@@ -1,7 +1,7 @@
 ---
 name: adversarial-review
-description: "Cross-host adversarial review of implementation plans, code/diffs/configs, or prompts/skill definitions. Classifies the artifact, routes the heavy critique to the agent that is NOT the host, cross-validates against independent host-side analysis, and returns material findings with severity and a verdict. Plan/code reviews include a mandatory over-engineering, YAGNI, and in-repo reuse counterfactual. Prompts are analyzed host-side across 6 dimensions. Provider routing includes Moonshot Kimi K3, direct-xAI Grok 4.5 high, and Gemini 3.6 Flash High first in the Antigravity ladder before explicit degraded mode."
-version: 0.9.2
+description: "Cross-host adversarial review of implementation plans, code/diffs/configs, or prompts/skill definitions. Classifies the artifact, routes the heavy critique to the agent that is NOT the host, cross-validates against independent host-side analysis, and returns material findings with severity and a verdict. Plan/code reviews include a mandatory over-engineering, YAGNI, and in-repo reuse counterfactual. Prompts are analyzed host-side across 6 dimensions. Provider routing includes OpenCode Go DeepSeek V4 Flash xhigh, Moonshot Kimi K3, direct-xAI Grok 4.5 high, and Gemini 3.6 Flash High first in the Antigravity ladder before explicit degraded mode."
+version: 0.9.3
 model: inherit
 allowed-tools: ["Read", "Grep", "Glob", "Bash"]
 triggers:
@@ -105,11 +105,11 @@ and do not claim missed in-repo reuse.
     then **direct xAI via Grok CLI**, then **Pi model chain**. Plans are
     architect(Claude)-authored, so Codex is the cross-family reviewer there.
 - Host **Codex** → external is **Pi model chain** starting with Pi xAI OAuth
-  Grok 4.5 (`xai-oauth/grok-4.5` with `--thinking xhigh`), then GLM, then
+  Grok 4.5 (`xai-oauth/grok-4.5` with `--thinking xhigh`), then OpenCode Go DeepSeek V4 Flash xhigh, then
   direct Moonshot Kimi K3 xhigh, then **Claude (Opus, xhigh)**, then direct xAI
   via Grok CLI
 - Host **Grok Build CLI** → **Codex (GPT-5.6 Luna, max)**, then **Claude (Opus, xhigh)**, then
-  **non-xAI Pi chain** (GLM, then direct Moonshot Kimi K3 xhigh). Never Grok itself
+  **non-xAI Pi chain** (DeepSeek, then direct Moonshot Kimi K3 xhigh). Never Grok itself
 - Host **Pi** → **Codex (GPT-5.6 Luna, max)**, then **Claude (Opus, xhigh)**,
   then **direct xAI via Grok CLI**. Never Pi itself
 - All externals unavailable → **DEGRADED MODE**: host self-review with explicit
@@ -154,7 +154,7 @@ echo "exit=$?"
   default. Model and effort are intentionally not overridable: this route is
   review-only and always uses `--sandbox read-only`.
 - Pi model chain default: `xai-oauth/grok-4.5` with `--thinking xhigh`,
-  `opencode-go/glm-5.2:high`, `moonshotai/kimi-k3:xhigh` (Moonshot direct via
+  `opencode-go/deepseek-v4-flash:xhigh`, `moonshotai/kimi-k3:xhigh` (Moonshot direct via
   `MOONSHOT_API_KEY`). Override via `ADVERSARIAL_REVIEW_PI_MODELS`.
   Override the Pi thinking flag via `ADVERSARIAL_REVIEW_PI_THINKING`; default
   is `xhigh` for the first explicit model token without a `:level` suffix.

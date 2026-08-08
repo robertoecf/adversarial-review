@@ -16,7 +16,7 @@ re-rank or fall through after success.
 | `claude`, artifact=code (default) | Direct xAI, Grok 4.5 high | Codex (`gpt-5.6-luna` max) | Pi model chain | Antigravity model ladder | DEGRADED: host self-review |
 | `claude`, artifact=plan | Codex (`gpt-5.6-luna` max) | Direct xAI, Grok 4.5 high | Pi model chain | Antigravity model ladder | DEGRADED: host self-review |
 | `codex`       | Pi model chain, xAI OAuth Grok 4.5 xhigh first | Claude (`claude -p` Opus xhigh) | Direct xAI | Antigravity model ladder | DEGRADED: host self-review |
-| `grok`        | Codex (`gpt-5.6-luna` max) | Claude (`claude -p` Opus xhigh) | Non-xAI Pi chain, GLM then Kimi | Antigravity model ladder | DEGRADED: host self-review |
+| `grok`        | Codex (`gpt-5.6-luna` max) | Claude (`claude -p` Opus xhigh) | Non-xAI Pi chain, DeepSeek then Kimi, never Grok | Antigravity model ladder | DEGRADED: host self-review |
 | `pi`          | Codex (`gpt-5.6-luna` max) | Claude (`claude -p` Opus xhigh) | Direct xAI | Antigravity model ladder | DEGRADED: host self-review |
 | `unknown`     | Direct xAI | Pi model chain | none | Antigravity model ladder | DEGRADED: host self-review |
 
@@ -63,11 +63,11 @@ Uses headless Pi with this default model chain:
 
 ```bash
 xai-oauth/grok-4.5 --thinking xhigh
-opencode-go/glm-5.2:high
+opencode-go/deepseek-v4-flash:xhigh
 moonshotai/kimi-k3:xhigh
 ```
 
-The first model is called as `pi -p --mode text --no-tools --no-session --model xai-oauth/grok-4.5 --thinking xhigh`. The `default` token is still supported as an explicit override, and then Pi is called without `--model`, so Pi's own configured provider, model, and thinking level decide that attempt. The Moonshot leg is Kimi K3 xhigh through direct Moonshot API via Pi provider `moonshotai`; it is not OpenRouter. When the detected host is Grok, the script forces the non-xAI suffix only, GLM followed by Kimi, so Grok never reviews Grok through Pi.
+The first model is called as `pi -p --mode text --no-tools --no-session --model xai-oauth/grok-4.5 --thinking xhigh`. The `default` token is still supported as an explicit override, and then Pi is called without `--model`, so Pi's own configured provider, model, and thinking level decide that attempt. The Moonshot leg is Kimi K3 xhigh through direct Moonshot API via Pi provider `moonshotai`; it is not OpenRouter. When the detected host is Grok, the script forces the non-xAI suffix only, DeepSeek then Kimi, never Grok through Pi.
 
 See [`pi-integration.md`](pi-integration.md). The call must stay in the caller's
 repo/worktree root on this machine because the opencode-go key can resolve

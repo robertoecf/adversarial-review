@@ -1,6 +1,6 @@
 # adversarial-review
 
-**v0.9.2**: Cross-host adversarial review for coding workflows. Works in
+**v0.9.3**: Cross-host adversarial review for coding workflows. Works in
 **Claude Code, Codex, Pi, and Grok** from the same source: detects which agent
 host you're running in and routes the heavy critique to the OTHER agent.
 
@@ -9,12 +9,15 @@ attack surfaces first; material-only findings; mandatory simplicity
 counterfactuals; steerable focus; terse ship/no-ship summary. Lessons adapted
 from OpenAI Codex Companion and Matt Pocock's engineering skills.
 
-Version note: v0.9.2 changes the Luna reviewer effort to max. v0.9.1 makes Gemini 3.6 Flash High the first Antigravity model,
-with provider and quota fallthrough unchanged. Routing policy 2026-07-23
+Version note: v0.9.3 replaces the OpenCode Go fallback with DeepSeek V4 Flash
+xhigh. Accounts without the required China-hosting opt-in receive a 403 on
+that leg and fall through to Moonshot Kimi K3. v0.9.1 makes Gemini 3.6 Flash
+High the first Antigravity model, with provider and quota fallthrough
+unchanged. Routing policy 2026-07-23
 makes Grok 4.5, xAI's frontier model, the sole direct-xAI model at high effort.
 v0.9.0 moved the direct Moonshot leg to Kimi K3 xhigh and made Antigravity
 choose from a quality-first Claude, Gemini, and GPT ladder with quota fallback.
-v0.8.2 pinned the Codex reviewer; v0.9.2 now uses max effort.
+v0.8.2 pinned the Codex reviewer; v0.9.3 uses Luna at max effort.
 
 ## Simplicity counterfactual
 
@@ -48,12 +51,12 @@ This plugin enforces that principle automatically:
   through direct xAI using `grok-4.5 --reasoning-effort high`. Grok 4.5 is
   xAI's frontier model, and high is the largest current Grok CLI tier
 - Running in **Grok** -> external reviewer is **Codex Luna max**, then
-  **Claude (Opus, xhigh)**, then a non-xAI Pi chain using GLM followed by
-  direct Moonshot Kimi K3 xhigh
+  **Claude (Opus, xhigh)**, then a non-xAI Pi chain using DeepSeek then direct
+  Moonshot Kimi K3 xhigh, never Grok
 - Running in **Claude Code** plan review uses Codex, direct-xAI Grok, then the
   Pi model chain. Code/diff review uses direct-xAI Grok, Codex, then the Pi
   model chain (`xai-oauth/grok-4.5` with `--thinking xhigh`,
-  `opencode-go/glm-5.2:high`, `moonshotai/kimi-k3:xhigh` direct API). Both paths
+  `opencode-go/deepseek-v4-flash:xhigh`, `moonshotai/kimi-k3:xhigh` direct API). Both paths
   then use the quality-first Antigravity ladder (`agy -p "$prompt" --model ...`)
 - Everything unavailable -> **degraded mode** with explicit banner: the host
   reviews itself, but the user is told the cross-host principle was bypassed
