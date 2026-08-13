@@ -9,7 +9,7 @@ provider and it never calls the standalone `gemini` CLI.
 The script runs `agy models`, keeps only currently listed candidates, and
 tries this quality-first ladder:
 
-1. `gemini-3.6-flash-high`
+1. `gemini-3.7-flash-high`
 2. `claude-opus-4-6-thinking`
 3. `gemini-3.1-pro-high`
 4. `claude-sonnet-4-6`

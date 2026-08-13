@@ -1,6 +1,6 @@
 # adversarial-review
 
-**v0.9.3**: Cross-host adversarial review for coding workflows. Works in
+**v0.9.4**: Cross-host adversarial review for coding workflows. Works in
 **Claude Code, Codex, Pi, and Grok** from the same source: detects which agent
 host you're running in and routes the heavy critique to the OTHER agent.
 
@@ -9,15 +9,21 @@ attack surfaces first; material-only findings; mandatory simplicity
 counterfactuals; steerable focus; terse ship/no-ship summary. Lessons adapted
 from OpenAI Codex Companion and Matt Pocock's engineering skills.
 
-Version note: v0.9.3 replaces the OpenCode Go fallback with DeepSeek V4 Flash
-xhigh. Accounts without the required China-hosting opt-in receive a 403 on
-that leg and fall through to Moonshot Kimi K3. v0.9.1 makes Gemini 3.6 Flash
+Version note: v0.9.4 makes Codex-host review author-aware. Codex-authored plans
+and contracts go to Grok first, while Grok-authored worker diffs go to Codex
+Luna max first. Omitted authors infer `codex` for plans and `grok` for code.
+It also changes the Antigravity default to Gemini 3.7 Flash High. The previous
+release replaced the OpenCode Go fallback with DeepSeek V4 Flash xhigh.
+Antigravity discovery now accepts the CLI's tabular model catalog, and empty
+provider responses fall through instead of ending the review with no output.
+Accounts without the required China-hosting opt-in receive a 403 on that leg
+and fall through to Moonshot Kimi K3. v0.9.1 originally made Gemini 3.6 Flash
 High the first Antigravity model, with provider and quota fallthrough
 unchanged. Routing policy 2026-07-23
 makes Grok 4.5, xAI's frontier model, the sole direct-xAI model at high effort.
 v0.9.0 moved the direct Moonshot leg to Kimi K3 xhigh and made Antigravity
 choose from a quality-first Claude, Gemini, and GPT ladder with quota fallback.
-v0.8.2 pinned the Codex reviewer; v0.9.3 uses Luna at max effort.
+v0.8.2 pinned the Codex reviewer; the current release uses Luna at max effort.
 
 ## Simplicity counterfactual
 
@@ -46,10 +52,10 @@ This plugin enforces that principle automatically:
 - Running in **Claude Code** -> external reviewer is **Codex** (`codex exec`,
   `gpt-5.6-luna max` via ChatGPT subscription auth) for plans, with Grok first
   for code/diff reviews
-- Running in **Codex** -> external reviewer is **Pi xAI OAuth Grok 4.5 with xhigh thinking**
-  first, then **Claude (Opus, xhigh)** via `claude -p`, then the Grok CLI
-  through direct xAI using `grok-4.5 --reasoning-effort high`. Grok 4.5 is
-  xAI's frontier model, and high is the largest current Grok CLI tier
+- Running in **Codex** -> routing uses `ADVERSARIAL_REVIEW_AUTHOR`. Codex-authored
+  artifacts go to **Pi xAI OAuth Grok 4.5 xhigh** first. Grok-authored artifacts
+  go to **Codex Luna max** first, then Claude and a non-xAI Pi chain. If author is
+  omitted, plans infer `codex` and code/diffs infer `grok`
 - Running in **Grok** -> external reviewer is **Codex Luna max**, then
   **Claude (Opus, xhigh)**, then a non-xAI Pi chain using DeepSeek then direct
   Moonshot Kimi K3 xhigh, never Grok
@@ -71,7 +77,7 @@ SKILL.md (same file in both hosts)
    │     ├─ lib/detect-host.sh  (override -> env -> PPID walk)
    │     ├─ partner = NOT host
    │     ├─ ADVERSARIAL_REVIEW_DEPTH = 1  (anti-recursion guard)
-   │     ├─ select ordered partners from host + artifact
+   │     ├─ select ordered partners from host + artifact + author
    │     ├─ try Codex, Claude, direct xAI, or Pi in that route's order
    │     ├─ on fail -> quality-first Antigravity ladder
    │     └─ on fail -> degraded mode (exit 2)
@@ -129,7 +135,7 @@ to work (otherwise you'll get DEGRADED mode):
 # When host=claude, partner=codex:
 codex login
 
-# When host=codex, partner=Pi xAI OAuth Grok 4.5 with xhigh thinking first:
+# When host=codex and author=codex, partner=Pi xAI OAuth Grok 4.5 first:
 pi --version
 
 # Host=codex fallback after Pi:

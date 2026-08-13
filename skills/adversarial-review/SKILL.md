@@ -1,7 +1,7 @@
 ---
 name: adversarial-review
-description: "Cross-host adversarial review of implementation plans, code/diffs/configs, or prompts/skill definitions. Classifies the artifact, routes the heavy critique to the agent that is NOT the host, cross-validates against independent host-side analysis, and returns material findings with severity and a verdict. Plan/code reviews include a mandatory over-engineering, YAGNI, and in-repo reuse counterfactual. Prompts are analyzed host-side across 6 dimensions. Provider routing includes OpenCode Go DeepSeek V4 Flash xhigh, Moonshot Kimi K3, direct-xAI Grok 4.5 high, and Gemini 3.6 Flash High first in the Antigravity ladder before explicit degraded mode."
-version: 0.9.3
+description: "Cross-host adversarial review of implementation plans, code/diffs/configs, or prompts/skill definitions. Classifies the artifact, routes the heavy critique to the agent that is NOT the host, cross-validates against independent host-side analysis, and returns material findings with severity and a verdict. Plan/code reviews include a mandatory over-engineering, YAGNI, and in-repo reuse counterfactual. Prompts are analyzed host-side across 6 dimensions. Provider routing includes OpenCode Go DeepSeek V4 Flash xhigh, Moonshot Kimi K3, direct-xAI Grok 4.5 high, and Gemini 3.7 Flash High first in the Antigravity ladder before explicit degraded mode."
+version: 0.9.4
 model: inherit
 allowed-tools: ["Read", "Grep", "Glob", "Bash"]
 triggers:
@@ -104,10 +104,13 @@ and do not claim missed in-repo reuse.
     Luna, max)** first,
     then **direct xAI via Grok CLI**, then **Pi model chain**. Plans are
     architect(Claude)-authored, so Codex is the cross-family reviewer there.
-- Host **Codex** → external is **Pi model chain** starting with Pi xAI OAuth
-  Grok 4.5 (`xai-oauth/grok-4.5` with `--thinking xhigh`), then OpenCode Go DeepSeek V4 Flash xhigh, then
-  direct Moonshot Kimi K3 xhigh, then **Claude (Opus, xhigh)**, then direct xAI
-  via Grok CLI
+- Host **Codex** -> order depends on `ADVERSARIAL_REVIEW_AUTHOR`:
+  - Author `codex` (aliases `sol`, `openai`): **Pi model chain** starting with
+    xAI OAuth Grok 4.5 xhigh, then **Claude**, then direct xAI Grok.
+  - Author `grok` (alias `xai`): **Codex GPT-5.6 Luna max**, then **Claude**,
+    then the non-xAI Pi chain (DeepSeek, then Moonshot Kimi K3).
+  - Any other author: Luna, Claude, then the non-xAI Pi chain.
+  - Omitted author: infer `codex` for plans and `grok` for code or other artifacts.
 - Host **Grok Build CLI** → **Codex (GPT-5.6 Luna, max)**, then **Claude (Opus, xhigh)**, then
   **non-xAI Pi chain** (DeepSeek, then direct Moonshot Kimi K3 xhigh). Never Grok itself
 - Host **Pi** → **Codex (GPT-5.6 Luna, max)**, then **Claude (Opus, xhigh)**,
@@ -132,14 +135,18 @@ Pipe the prompt into `lib/call-external.sh` (handles host detection, routing,
 anti-recursion, the Antigravity model ladder, and degraded mode):
 
 ```bash
-# ARTIFACT comes from Step 0: "plan" for plan reviews, "code" for
-# code/diff/config reviews (also the safe default when mixed/ambiguous).
-echo "$PROMPT" | ADVERSARIAL_REVIEW_ARTIFACT="$ARTIFACT" bash "$PLUGIN_DIR/lib/call-external.sh"
+# ARTIFACT comes from Step 0. AUTHOR is the artifact's author when known.
+echo "$PROMPT" | ADVERSARIAL_REVIEW_ARTIFACT="$ARTIFACT" \
+  ADVERSARIAL_REVIEW_AUTHOR="$AUTHOR" bash "$PLUGIN_DIR/lib/call-external.sh"
 echo "exit=$?"
 ```
 
 - **stdout** = partner's analysis; **stderr** = operational logs;
   **exit** = `0` external success, `2` degraded, `1` error/recursion.
+- On Codex, set `AUTHOR` to `codex`, `grok`, `claude`, `pi`, `user`, or
+  `unknown`. Aliases `sol`, `openai`, `xai`, and `anthropic` are accepted
+  case-insensitively. If omitted, plans infer `codex`; code and other artifacts
+  infer `grok`. Invalid explicit values warn and use `unknown`.
 - Do **not** call `codex exec`, `claude -p`, `grok -p`, or `pi -p` directly —
   always go through `lib/call-external.sh` (anti-recursion via
   `ADVERSARIAL_REVIEW_DEPTH`).
@@ -161,7 +168,7 @@ echo "exit=$?"
   Do not move the call to `/tmp` — Doppler-scoped opencode-go credentials
   resolve from the current directory.
 - Antigravity fallback discovers models with `agy models`, then tries a
-  quality-first cross-provider ladder. The default starts with Gemini 3.6
+  quality-first cross-provider ladder. The default starts with Gemini 3.7
   Flash High, then Claude Opus 4.6 Thinking, Gemini 3.1 Pro High, Claude Sonnet
   4.6, GPT OSS 120B Medium, and Gemini 3.6 Flash Medium. A failed quota or call advances
   to the next listed model. Override via

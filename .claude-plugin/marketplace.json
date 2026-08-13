@@ -5,14 +5,14 @@
     "email": "robertoecf@gmail.com"
   },
   "metadata": {
-    "description": "Cross-host adversarial review with Codex GPT-5.6 Luna max, OpenCode Go DeepSeek V4 Flash xhigh, Moonshot Kimi K3, direct-xAI Grok 4.5 high, and Gemini 3.6 Flash High as the Antigravity default.",
-    "version": "0.9.3"
+    "description": "Cross-host adversarial review with Codex GPT-5.6 Luna max, OpenCode Go DeepSeek V4 Flash xhigh, Moonshot Kimi K3, direct-xAI Grok 4.5 high, and Gemini 3.7 Flash High as the Antigravity default.",
+    "version": "0.9.4"
   },
   "plugins": [
     {
       "name": "adversarial-review",
-      "description": "Cross-host adversarial review with material-only findings and mandatory over-engineering counterfactuals. Provider-aware routing uses Codex GPT-5.6 Luna max, OpenCode Go DeepSeek V4 Flash xhigh, Moonshot Kimi K3 xhigh, direct-xAI Grok 4.5 high, and Gemini 3.6 Flash High first in Antigravity.",
-      "version": "0.9.3",
+      "description": "Cross-host adversarial review with material-only findings and mandatory over-engineering counterfactuals. Provider-aware routing uses Codex GPT-5.6 Luna max, OpenCode Go DeepSeek V4 Flash xhigh, Moonshot Kimi K3 xhigh, direct-xAI Grok 4.5 high, and Gemini 3.7 Flash High first in Antigravity.",
+      "version": "0.9.4",
       "source": "./",
       "author": {
         "name": "Roberto",

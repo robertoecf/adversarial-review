@@ -26,7 +26,7 @@ files, blocking-vs-non-blocking ambiguity) without proportionate value.
 | Detected host | Partner                              |
 |---------------|--------------------------------------|
 | `claude`      | Code: direct-xAI Grok 4.5, Codex Luna max, Pi. Plan: Codex Luna max, direct-xAI Grok 4.5, Pi. Then Antigravity |
-| `codex`       | Pi chain (xAI OAuth Grok 4.5 xhigh, OpenCode Go DeepSeek V4 Flash xhigh, Moonshot Kimi K3), then Claude, direct xAI, and Antigravity |
+| `codex`       | Author-aware: Codex-authored work goes to Pi Grok first; Grok-authored work goes to Codex Luna max first. Omitted plan author infers Codex; omitted code author infers Grok |
 | `grok`        | Codex GPT-5.6 Luna max, then Claude, non-xAI Pi (DeepSeek then Kimi, never Grok), and the Antigravity ladder |
 | `pi`          | Codex GPT-5.6 Luna max, then Claude, direct xAI, and the Antigravity ladder |
 | `unknown`     | Direct xAI, then Pi, then the Antigravity ladder |
@@ -34,6 +34,11 @@ files, blocking-vs-non-blocking ambiguity) without proportionate value.
 Detection happens at every invocation via `lib/detect-host.sh`. See
 `references/host-detection.md` for the priority order and the env-leak
 asymmetry that drives "Codex env first, Claude env second".
+
+Codex-host callers should set `ADVERSARIAL_REVIEW_AUTHOR` to `codex`, `grok`,
+`claude`, `pi`, `user`, or `unknown`. Aliases `sol`, `openai`, `xai`, and
+`anthropic` are accepted case-insensitively. Unknown authors use Luna first,
+then Claude and the non-xAI Pi chain.
 
 ## Anti-recursion contract
 
