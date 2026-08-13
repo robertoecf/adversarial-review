@@ -9,7 +9,8 @@
 #     plan: codex Luna max first, then grok, then pi model chain.
 #       Rationale: plans are architect(Claude)-authored, so Codex IS the
 #       cross-family reviewer there.
-#   host=codex  -> external=pi xai-oauth/grok-4.5 with xhigh thinking, then pi fallbacks, then claude, then direct xAI
+#   host=codex  -> author-aware: Codex-authored work goes to Grok; Grok-authored
+#                  work goes to Codex Luna max; unknown authors default to Luna
 #   host=grok   -> external=codex Luna max, then claude, then non-xAI pi model chain
 #   host=pi     -> external=codex Luna max, then claude, then grok (never pi itself)
 #
@@ -24,7 +25,11 @@
 # Env vars consumed:
 #   ADVERSARIAL_REVIEW_HOST          override host detection (passed to detect-host.sh)
 #   ADVERSARIAL_REVIEW_ARTIFACT      what is being reviewed: "code" (default) or "plan";
-#                                    only affects partner order for host=claude
+#                                    affects partner order for host=claude and
+#                                    omitted-author inference for host=codex
+#   ADVERSARIAL_REVIEW_AUTHOR        artifact author for host=codex: codex, grok,
+#                                    claude, pi, user, or unknown; aliases sol,
+#                                    openai, xai, and anthropic are accepted
 #   ADVERSARIAL_REVIEW_DEPTH         anti-recursion counter; refuse if >= 1
 #   ADVERSARIAL_REVIEW_TIMEOUT       seconds; default 300
 #   ADVERSARIAL_REVIEW_FORCE_DEGRADED  if "1", skip externals and go straight to degraded
@@ -54,7 +59,30 @@ if ! mkdir -p "$LOG_DIR"; then
 fi
 chmod 700 "$LOG_DIR" 2>/dev/null || true
 
-log() { printf '[call-external] %s\n' "$*" >&2; }
+# Keep operator logs on the original stderr even when call sites redirect
+# run_and_emit_on_success stderr into provider *.err files.
+if [ -z "${CALL_EXTERNAL_LOG_FD:-}" ]; then
+  exec 3>&2
+  CALL_EXTERNAL_LOG_FD=3
+fi
+log() { printf '[call-external] %s\n' "$*" >&"$CALL_EXTERNAL_LOG_FD"; }
+
+normalize_author() {
+  local raw="${1:-}"
+  local lower
+  lower="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
+  case "$lower" in
+    "") printf '\n' ;;
+    codex|sol|openai) printf 'codex\n' ;;
+    grok|xai) printf 'grok\n' ;;
+    claude|anthropic) printf 'claude\n' ;;
+    pi|user|unknown) printf '%s\n' "$lower" ;;
+    *)
+      log "WARN: invalid ADVERSARIAL_REVIEW_AUTHOR=${raw}; using unknown"
+      printf 'unknown\n'
+      ;;
+  esac
+}
 
 run_with_timeout() {
   local secs="$1"
@@ -73,6 +101,11 @@ run_and_emit_on_success() {
   local output_file
   output_file="$(mktemp "${TMPDIR:-/tmp}/call-external-output.XXXXXX")" || return 1
   if "$@" >"$output_file"; then
+    if [ ! -s "$output_file" ]; then
+      log "WARN: external command exited 0 with empty stdout; treating as failure"
+      rm -f "$output_file"
+      return 1
+    fi
     cat "$output_file"
     rm -f "$output_file"
     return 0
@@ -254,7 +287,7 @@ call_antigravity() {
   local cmd
   cmd="$(find_antigravity_cmd)" || return 1
 
-  local models_csv="${ADVERSARIAL_REVIEW_ANTIGRAVITY_MODELS:-gemini-3.6-flash-high,claude-opus-4-6-thinking,gemini-3.1-pro-high,claude-sonnet-4-6,gpt-oss-120b-medium,gemini-3.6-flash-medium}"
+  local models_csv="${ADVERSARIAL_REVIEW_ANTIGRAVITY_MODELS:-gemini-3.7-flash-high,claude-opus-4-6-thinking,gemini-3.1-pro-high,claude-sonnet-4-6,gpt-oss-120b-medium,gemini-3.6-flash-medium}"
   local catalog=""
   local catalog_available=0
   if catalog="$(run_with_timeout "$TIMEOUT" "$cmd" models 2>>"$LOG_DIR/antigravity.err")"; then
@@ -272,7 +305,8 @@ call_antigravity() {
     model="${model%"${model##*[![:space:]]}"}"
     [ -n "$model" ] || continue
 
-    if [ "$catalog_available" -eq 1 ] && ! printf '%s\n' "$catalog" | grep -Fxq "$model"; then
+    if [ "$catalog_available" -eq 1 ] && ! printf '%s\n' "$catalog" \
+      | awk -v wanted="$model" '$1 == wanted { found = 1 } END { exit !found }'; then
       log "Antigravity model unavailable, skipping: ${model}"
       continue
     fi
@@ -340,12 +374,46 @@ case "$HOST" in
     log "pi failed; trying Antigravity model ladder"
     ;;
   codex)
-    if call_pi; then exit 0; fi
-    log "pi failed; trying claude"
-    if call_claude; then exit 0; fi
-    log "claude -p failed; trying grok"
-    if call_grok; then exit 0; fi
-    log "grok failed; trying Antigravity model ladder"
+    ARTIFACT="${ADVERSARIAL_REVIEW_ARTIFACT:-code}"
+    AUTHOR="$(normalize_author "${ADVERSARIAL_REVIEW_AUTHOR:-}")"
+    if [ -z "$AUTHOR" ]; then
+      if [ "$ARTIFACT" = "plan" ]; then
+        AUTHOR=codex
+      else
+        AUTHOR=grok
+      fi
+      log "artifact=${ARTIFACT} author omitted; inferred author=${AUTHOR}"
+    else
+      log "artifact=${ARTIFACT} author=${AUTHOR}"
+    fi
+
+    case "$AUTHOR" in
+      codex)
+        if call_pi; then exit 0; fi
+        log "pi failed; trying claude"
+        if call_claude; then exit 0; fi
+        log "claude -p failed; trying grok"
+        if call_grok; then exit 0; fi
+        log "grok failed; trying Antigravity model ladder"
+        ;;
+      grok)
+        if call_codex; then exit 0; fi
+        log "codex exec failed; trying claude"
+        if call_claude; then exit 0; fi
+        log "claude -p failed; trying non-xAI pi chain"
+        if ADVERSARIAL_REVIEW_PI_MODELS="opencode-go/deepseek-v4-flash:xhigh,moonshotai/kimi-k3:xhigh" call_pi; then exit 0; fi
+        log "non-xAI pi chain failed; trying Antigravity model ladder"
+        ;;
+      *)
+        log "author=${AUTHOR} has no safe opposite-family inference; using Luna first"
+        if call_codex; then exit 0; fi
+        log "codex exec failed; trying claude"
+        if call_claude; then exit 0; fi
+        log "claude -p failed; trying non-xAI pi chain"
+        if ADVERSARIAL_REVIEW_PI_MODELS="opencode-go/deepseek-v4-flash:xhigh,moonshotai/kimi-k3:xhigh" call_pi; then exit 0; fi
+        log "non-xAI pi chain failed; trying Antigravity model ladder"
+        ;;
+    esac
     ;;
   grok)
     if call_codex; then exit 0; fi

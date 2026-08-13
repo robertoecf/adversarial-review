@@ -1,15 +1,23 @@
 # CLAUDE.md - Claude Code directives
 
-## Plugin: adversarial-review v0.9.3
+## Plugin: adversarial-review v0.9.4
 
 Cross-host adversarial review for coding workflows. Detects which agent host
 the SKILL.md is running under and routes review to another model family. Claude
 code reviews use direct-xAI Grok 4.5 first, while Claude plan reviews use Codex
-Luna first. Codex uses the Pi chain first. Grok and Pi use Codex first. Each
+Luna first. Codex-host routing is author-aware: Codex-authored artifacts use the
+Pi Grok chain first, while Grok-authored artifacts use Codex Luna first. Grok
+and Pi hosts use Codex first. Each
 route has explicit secondary providers, then a quality-first Antigravity
 Claude, Gemini, and GPT ladder, then degraded host-self with explicit warning.
 
-v0.9.3 replaces the OpenCode Go fallback with DeepSeek V4 Flash xhigh and keeps the Luna reviewer at max effort. v0.9.1 makes Gemini 3.6 Flash High the first Antigravity candidate. Routing
+v0.9.4 adds author-aware Codex routing through `ADVERSARIAL_REVIEW_AUTHOR`
+and changes the Antigravity default to Gemini 3.7 Flash High. It also accepts
+Antigravity's tabular model catalog and falls through on empty provider output.
+The previous
+release replaced the OpenCode Go fallback with DeepSeek V4 Flash xhigh and
+kept the Luna reviewer at max effort. v0.9.1 originally made Gemini 3.6 Flash
+High the first Antigravity candidate. Routing
 policy 2026-07-23 makes Grok 4.5, xAI's frontier model, the sole direct-xAI
 model at high effort. v0.9.0 routes direct Moonshot review to Kimi K3 xhigh
 and adds quota-aware Antigravity failover across providers. v0.8.2 pinned every Codex reviewer

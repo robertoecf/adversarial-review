@@ -1,7 +1,7 @@
 {
   "name": "adversarial-review",
-  "version": "0.9.3",
-  "description": "Cross-host adversarial review for coding workflows. Material-only findings include over-engineering and missed reuse. Provider routing uses Codex GPT-5.6 Luna max, OpenCode Go DeepSeek V4 Flash xhigh, direct Moonshot Kimi K3 xhigh, direct-xAI Grok 4.5 high, and Gemini 3.6 Flash High first in the Antigravity ladder.",
+  "version": "0.9.4",
+  "description": "Cross-host adversarial review for coding workflows. Material-only findings include over-engineering and missed reuse. Provider routing uses Codex GPT-5.6 Luna max, OpenCode Go DeepSeek V4 Flash xhigh, direct Moonshot Kimi K3 xhigh, direct-xAI Grok 4.5 high, and Gemini 3.7 Flash High first in the Antigravity ladder.",
   "author": {
     "name": "Roberto",
     "email": "robertoecf@gmail.com"

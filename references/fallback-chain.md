@@ -15,7 +15,9 @@ re-rank or fall through after success.
 |---------------|----------------------------|------------------------------------|-------------------------------|-------------------------------|-------------------------------|
 | `claude`, artifact=code (default) | Direct xAI, Grok 4.5 high | Codex (`gpt-5.6-luna` max) | Pi model chain | Antigravity model ladder | DEGRADED: host self-review |
 | `claude`, artifact=plan | Codex (`gpt-5.6-luna` max) | Direct xAI, Grok 4.5 high | Pi model chain | Antigravity model ladder | DEGRADED: host self-review |
-| `codex`       | Pi model chain, xAI OAuth Grok 4.5 xhigh first | Claude (`claude -p` Opus xhigh) | Direct xAI | Antigravity model ladder | DEGRADED: host self-review |
+| `codex`, author=codex | Pi model chain, xAI OAuth Grok 4.5 xhigh first | Claude (`claude -p` Opus xhigh) | Direct xAI | Antigravity model ladder | DEGRADED: host self-review |
+| `codex`, author=grok | Codex (`gpt-5.6-luna` max) | Claude (`claude -p` Opus xhigh) | Non-xAI Pi chain, DeepSeek then Kimi | Antigravity model ladder | DEGRADED: host self-review |
+| `codex`, any other author | Codex (`gpt-5.6-luna` max) | Claude (`claude -p` Opus xhigh) | Non-xAI Pi chain, DeepSeek then Kimi | Antigravity model ladder | DEGRADED: host self-review |
 | `grok`        | Codex (`gpt-5.6-luna` max) | Claude (`claude -p` Opus xhigh) | Non-xAI Pi chain, DeepSeek then Kimi, never Grok | Antigravity model ladder | DEGRADED: host self-review |
 | `pi`          | Codex (`gpt-5.6-luna` max) | Claude (`claude -p` Opus xhigh) | Direct xAI | Antigravity model ladder | DEGRADED: host self-review |
 | `unknown`     | Direct xAI | Pi model chain | none | Antigravity model ladder | DEGRADED: host self-review |
@@ -32,6 +34,13 @@ Host `claude` order is artifact-aware (user decision 2026-07-11, env
 first because the diff is normally Codex-authored and Codex reviewing its own
 code would be same-family; plan reviews go to Codex first because the plan is
 architect(Claude)-authored.
+
+Host `codex` order is author-aware through `ADVERSARIAL_REVIEW_AUTHOR`.
+Canonical values are `codex`, `grok`, `claude`, `pi`, `user`, and `unknown`.
+Aliases `sol` and `openai` map to `codex`, `xai` maps to `grok`, and
+`anthropic` maps to `claude`, all case-insensitively. An invalid explicit value
+logs a warning and becomes `unknown`. When omitted, artifact `plan` infers
+`codex`; code and every other artifact infer `grok`.
 
 ### Codex (when host=claude and artifact=plan, or fallback for artifact=code)
 ```bash
@@ -55,7 +64,7 @@ auth is
 `XAI_API_KEY`; this is direct xAI key auth, not OpenRouter.
 See [`grok-integration.md`](grok-integration.md).
 
-### Pi (primary when host=codex, otherwise when earlier external paths fail)
+### Pi (primary when host=codex and author=codex, otherwise a fallback)
 ```bash
 which pi && pi --version
 ```
@@ -67,13 +76,13 @@ opencode-go/deepseek-v4-flash:xhigh
 moonshotai/kimi-k3:xhigh
 ```
 
-The first model is called as `pi -p --mode text --no-tools --no-session --model xai-oauth/grok-4.5 --thinking xhigh`. The `default` token is still supported as an explicit override, and then Pi is called without `--model`, so Pi's own configured provider, model, and thinking level decide that attempt. The Moonshot leg is Kimi K3 xhigh through direct Moonshot API via Pi provider `moonshotai`; it is not OpenRouter. When the detected host is Grok, the script forces the non-xAI suffix only, DeepSeek then Kimi, never Grok through Pi.
+The first model is called as `pi -p --mode text --no-tools --no-session --model xai-oauth/grok-4.5 --thinking xhigh`. The `default` token is still supported as an explicit override, and then Pi is called without `--model`, so Pi's own configured provider, model, and thinking level decide that attempt. The Moonshot leg is Kimi K3 xhigh through direct Moonshot API via Pi provider `moonshotai`; it is not OpenRouter. When the detected host is Grok, or host Codex is reviewing any non-Codex authorship (`grok`, `claude`, `pi`, `user`, or `unknown`), the script forces the non-xAI suffix only, DeepSeek then Kimi, never Grok through Pi.
 
 See [`pi-integration.md`](pi-integration.md). The call must stay in the caller's
 repo/worktree root on this machine because the opencode-go key can resolve
 through Doppler's current-directory scope.
 
-### Claude (when host=codex after Pi fails)
+### Claude (secondary for host=codex)
 ```bash
 which claude
 ```
