@@ -6,13 +6,13 @@
   },
   "metadata": {
     "description": "Cross-host adversarial review with Codex GPT-6 Astra max, OpenCode Go DeepSeek V4 Flash xhigh, Moonshot Kimi K3, direct-xAI Grok 4.6 xhigh, and Gemini 3.7 Flash High as the Antigravity default.",
-    "version": "0.9.8"
+    "version": "0.9.9"
   },
   "plugins": [
     {
       "name": "adversarial-review",
       "description": "Cross-host adversarial review with material-only findings and mandatory over-engineering counterfactuals. Author-aware routing: Claude-authored work goes to Codex GPT-6 Astra high, then Grok 4.7 xhigh; Codex-authored work goes to Grok 4.7 xhigh, never back to Codex; then the Pi chain (DeepSeek V4 Flash, Kimi K3) and the Gemini Antigravity ladder.",
-      "version": "0.9.8",
+      "version": "0.9.9",
       "source": "./",
       "author": {
         "name": "Roberto",
