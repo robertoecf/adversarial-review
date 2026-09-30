@@ -2,14 +2,12 @@
 
 ## Role in this plugin
 
-Claude CLI is the Codex-host fallback after Pi fails. The skill sends
-the wrapped prompt through `lib/call-external.sh`, which detects the host and
-(if codex and Pi failed) shells out to `claude -p --model opus --effort xhigh`
-in bare, prompt-only mode with no tools.
+On a Codex host, `claude -p` is T1 for Codex-, user- and unknown-authored
+work (see the roster in SKILL.md). `lib/claude-reviewer.sh` builds the call:
+`claude -p --model opus --effort xhigh` by default, with read-only tools.
 
-For the full chain (claude -> grok -> pi/opencode-go -> Antigravity -> degraded), see
-[`fallback-chain.md`](fallback-chain.md). For host detection, see
-[`host-detection.md`](host-detection.md).
+For the full chain, see [`fallback-chain.md`](fallback-chain.md). For host
+detection, see [`host-detection.md`](host-detection.md).
 
 ## Environment expectations
 
@@ -29,53 +27,45 @@ which claude || echo "NO_CLAUDE"
 The CLI itself manages its auth - if not logged in, the call will fail loudly
 rather than hang.
 
-## Invocation pattern (used by `lib/call-external.sh`)
+## Invocation pattern (built by `lib/claude-reviewer.sh`)
 
 ```bash
 claude -p \
-  --model opus \
-  --effort xhigh \
-  --bare \
-  --tools "" \
-  --dangerously-skip-permissions \
-  "<prompt>" \
-  2>>err.log \
-  </dev/null
+  --model opus --effort xhigh \
+  <auth-mode flags> \
+  --tools "Read,Grep,Glob" \
+  --strict-mcp-config --mcp-config '{"mcpServers":{}}' \
+  --no-session-persistence \
+  --input-format text --output-format text \
+  < prompt-file 2>>claude.err
 ```
 
-Why `--model opus`:
-- Adversarial review benefits from the strongest reasoning available;
-  Opus is the highest-tier model in the Claude family for code analysis.
+Auth-mode flags (`ADVERSARIAL_REVIEW_CLAUDE_AUTH`):
+- `api` (default): `--bare`, which skips hooks, plugins, auto-memory and
+  CLAUDE.md discovery.
+- `subscription`: `--setting-sources ""`, `--settings '{"disableAllHooks":true}'`,
+  `--disable-slash-commands`. `--bare` is not used here because it drops the
+  subscription login.
 
-Why `--effort xhigh`:
-- We want maximum reasoning budget on a critique pass - this is not a hot path.
-- Plan / code review is exactly the kind of work that justifies xhigh.
-
-Why `--dangerously-skip-permissions`:
-- `claude -p` runs non-interactively; permission prompts cannot be answered.
-- `--tools ""` removes tool access, so this flag cannot authorize file, shell,
-  network, or repository actions. It only avoids an interactive deadlock.
-
-Why `--bare --tools ""`:
-- `--bare` skips hooks, plugins, and auto-memory.
-- The reviewer receives only the supplied prompt and cannot inspect the current
-  directory or inherited environment through tools.
-
-Why `-p` (print mode):
-- Synchronous subprocess; stdout = final response, exit code = success/fail.
+Why these flags:
+- `--tools "Read,Grep,Glob"` lets the reviewer check claims against the
+  checkout it runs from, without edits, shell or network.
+- Empty strict MCP config: no connectors reach the reviewer.
+- `--no-session-persistence`: each review is a fresh, unsaved session.
+- `--model opus --effort xhigh`: a critique pass is not a hot path; override
+  with `ADVERSARIAL_REVIEW_CLAUDE_MODEL` and `ADVERSARIAL_REVIEW_CLAUDE_EFFORT`.
 
 ## Key flags
 
-| Flag                                    | Purpose                                          |
-|-----------------------------------------|--------------------------------------------------|
-| `-p, --print`                           | Non-interactive: emit response and exit          |
-| `--model <name>`                        | `opus` / `sonnet` / specific version             |
-| `--effort <level>`                      | `low` / `medium` / `high` / `xhigh` / `max`      |
-| `--dangerously-skip-permissions`        | Skip approval prompts (required for `-p`)        |
-| `--tools ""`                            | Disable all Claude tools                          |
-| `--add-dir <path>...`                   | Grant access to additional dirs (for context)    |
-| `--append-system-prompt <text>`         | Add to default system prompt                     |
-| `--bare`                                | Minimal mode - skip hooks, plugins, auto-memory  |
+| Flag | Purpose |
+|---|---|
+| `-p, --print` | Non-interactive: emit response and exit |
+| `--model <name>` | `opus` / `sonnet` / specific version |
+| `--effort <level>` | `low` / `medium` / `high` / `xhigh` / `max` |
+| `--tools "Read,Grep,Glob"` | Read-only tool allowlist |
+| `--bare` | api auth only: skip hooks, plugins, auto-memory |
+| `--setting-sources ""` | subscription auth: ignore user/project settings |
+| `--strict-mcp-config` | Use only the supplied (empty) MCP config |
 
 ## Anti-recursion contract
 
@@ -94,9 +84,9 @@ debugging; delete it to rotate.
 
 ## What this plugin does NOT do
 
-- **Does not load repository context or CLAUDE.md.** `--bare --tools ""`
-  makes the reviewer prompt-only. Callers must include every relevant excerpt
-  in the prompt.
+- **Does not load CLAUDE.md or project settings.** The reviewer can read files
+  in the checkout it runs from, but callers must still put the artifact and
+  the relevant excerpts in the prompt.
 - **Does not preserve conversation state.** Each `claude -p` is a fresh
   session. State that needs to persist across calls lives in
-  the caller's own state; bare mode disables auto-memory.
+  the caller's own state; `--no-session-persistence` keeps nothing.

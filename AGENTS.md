@@ -23,22 +23,24 @@ files, blocking-vs-non-blocking ambiguity) without proportionate value.
 
 ## Cross-host routing
 
-| Detected host | Partner                              |
-|---------------|--------------------------------------|
-| `claude`      | Code: direct-xAI Grok 4.5, Codex Luna max, Pi. Plan: Codex Luna max, direct-xAI Grok 4.5, Pi. Then Antigravity |
-| `codex`       | Author-aware: Codex-authored work goes to Pi Grok first; Grok-authored work goes to Codex Luna max first. Omitted plan author infers Codex; omitted code author infers Grok |
-| `grok`        | Codex GPT-5.6 Luna max, then Claude, non-xAI Pi (DeepSeek then Kimi, never Grok), and the Antigravity ladder |
-| `pi`          | Codex GPT-5.6 Luna max, then Claude, direct xAI, and the Antigravity ladder |
-| `unknown`     | Direct xAI, then Pi, then the Antigravity ladder |
+| Detected host | Partner |
+|---------------|---------|
+| `claude` | Claude authors (default): T1 Astra high via Pi, then `codex exec`; T2 Pi chain; T3 Gemini. Codex authors: T1 is the Claude main loop inline; wrapper adds T2/T3, never Codex |
+| `codex` | Codex/user/unknown authors: T1 `claude -p`; Claude/Pi/Grok authors: T1 Codex Astra. Then T2 Pi chain (non-xAI for Grok authors), T3 Gemini |
+| `grok` | Codex Astra, then Gemini |
+| `pi` | Codex Astra, then Claude, direct xAI, then Gemini |
+| `unknown` | Direct xAI, then Pi, then Gemini |
+
 
 Detection happens at every invocation via `lib/detect-host.sh`. See
 `references/host-detection.md` for the priority order and the env-leak
 asymmetry that drives "Codex env first, Claude env second".
 
-Codex-host callers should set `ADVERSARIAL_REVIEW_AUTHOR` to `codex`, `grok`,
-`claude`, `pi`, `user`, or `unknown`. Aliases `sol`, `openai`, `xai`, and
-`anthropic` are accepted case-insensitively. Unknown authors use Luna first,
-then Claude and the non-xAI Pi chain.
+Codex- and Claude-host callers should set `ADVERSARIAL_REVIEW_AUTHOR` to `codex`,
+`grok`, `claude`, `pi`, `user`, or `unknown`. Aliases `sol`, `openai`, `astra`,
+`xai`, and `anthropic` are accepted case-insensitively. On Codex, omitted authors
+infer `codex`; `user` and `unknown` follow the same Grok-first route. On Claude,
+omitted authors infer `claude`.
 
 ## Anti-recursion contract
 
@@ -82,8 +84,7 @@ Do not invent files, lines, or attack chains. Mark inferences.
 
 ## Fallback chain
 
-See `references/fallback-chain.md`. Order: primary partner -> secondary CLIs
--> quality-first Antigravity ladder -> DEGRADED. **The DEGRADED mode emits an explicit banner** in stdout and
+See `references/fallback-chain.md` and the SKILL.md roster. Order is host and author aware: T1 Claude/Codex cross-review, T2 Pi chain (non-xAI for Grok authors), T3 Gemini, then a same-family clean-context subagent, then DEGRADED mode. **The DEGRADED mode emits an explicit banner** in stdout and
 returns exit 2 from `call-external.sh` so the SKILL knows to surface it to
 the user.
 
@@ -105,3 +106,51 @@ the user.
 - **State persistence across calls.** Each `lib/call-external.sh` invocation
   is independent. State that needs to persist lives in host memory
   (`~/.claude/projects/<cwd>/memory/` or `~/.codex/memories/`).
+
+## Entry points
+
+- Claude Code: `/adversarial-review:adversarial-review`, the single entry point.
+  It classifies the input (plan, code, prompt) and runs the matching procedure.
+- Codex: `$adversarial-review` after `bash adapters/codex-skill/install.sh`
+  (symlinks into `~/.codex/skills/`).
+- `skills/<name>/SKILL.md` is the single source of truth for every host.
+
+## Dev gotchas
+
+- **`forced_login_method = "chatgpt"`** must be in `~/.codex/config.toml` for
+  ChatGPT-account users. Without it, `codex exec` can return 404 "Model not
+  found" even though the TUI works. See `references/codex-integration.md`.
+- **Codex reviewer** needs `--sandbox read-only`, `-m gpt-6-astra`, an explicit
+  `-c model_reasoning_effort` (`high` on host Claude, `medium` elsewhere) and
+  `--skip-git-repo-check`, since the prompt is the unit of review.
+- **Direct xAI through Grok CLI** uses `grok-4.7` with `--reasoning-effort xhigh`
+  and inherited `XAI_API_KEY` (not OpenRouter). The script checks `grok models`
+  and skips unavailable entries.
+- **Pi model chain (T2)** runs `pi -p --mode text --tools read,grep,find,ls --model`
+  from the caller's repo or worktree root. Default order is the SKILL.md roster:
+  `opencode-go/deepseek-v4.1-flash:xhigh`, `opencode-go/glm-5.3:high`,
+  `xai-oauth/grok-4.7:high`. Do not run it from `/tmp` when opencode-go keys
+  resolve through Doppler scope.
+- **Antigravity fallback** runs `agy models`, then tries `gemini-3.8-flash-high`,
+  `gemini-3.7-flash-high`, and `gemini-3.1-pro-high`, each one-shot with `-p`,
+  `--model`, `--sandbox`, and `--mode plan`. Never use `-c` or continue.
+- **Long prompts (>~6 kB) can stall the Codex backend.** Summarize huge inputs
+  instead of pasting them raw; a 200+ line plan once stalled `codex exec` for
+  20+ min at 0% CPU.
+- **`"skills": "./skills/"`** is required in `plugin.json` for Claude Code to
+  discover SKILL.md files.
+- **Global gitignore** at `~/.config/git/ignore` blocks
+  `.claude/settings.local.json`; use `git add -f` to include it.
+- No single file in this plugin should exceed 500 lines.
+
+## Dev workflow (Claude Code plugin)
+
+- Edit source at `/Users/macbook/repos/skills/plugins/adversarial-review/`.
+- The plugin cache at `~/.claude/plugins/cache/` does not follow source edits.
+  Reinstall after changes:
+  ```bash
+  claude plugin uninstall adversarial-review 2>/dev/null || true
+  claude plugin marketplace add ~/repos/skills/plugins/adversarial-review
+  claude plugin install adversarial-review@adversarial-review
+  ```
+  Then `/reload-plugins` in the current session.

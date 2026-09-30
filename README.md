@@ -1,6 +1,6 @@
 # adversarial-review
 
-**v0.9.4**: Cross-host adversarial review for coding workflows. Works in
+**v0.9.8**: Cross-host adversarial review for coding workflows. Works in
 **Claude Code, Codex, Pi, and Grok** from the same source: detects which agent
 host you're running in and routes the heavy critique to the OTHER agent.
 
@@ -9,21 +9,15 @@ attack surfaces first; material-only findings; mandatory simplicity
 counterfactuals; steerable focus; terse ship/no-ship summary. Lessons adapted
 from OpenAI Codex Companion and Matt Pocock's engineering skills.
 
-Version note: v0.9.4 makes Codex-host review author-aware. Codex-authored plans
-and contracts go to Grok first, while Grok-authored worker diffs go to Codex
-Luna max first. Omitted authors infer `codex` for plans and `grok` for code.
-It also changes the Antigravity default to Gemini 3.7 Flash High. The previous
-release replaced the OpenCode Go fallback with DeepSeek V4 Flash xhigh.
-Antigravity discovery now accepts the CLI's tabular model catalog, and empty
-provider responses fall through instead of ending the review with no output.
-Accounts without the required China-hosting opt-in receive a 403 on that leg
-and fall through to Moonshot Kimi K3. v0.9.1 originally made Gemini 3.6 Flash
-High the first Antigravity model, with provider and quota fallthrough
-unchanged. Routing policy 2026-07-23
-makes Grok 4.5, xAI's frontier model, the sole direct-xAI model at high effort.
-v0.9.0 moved the direct Moonshot leg to Kimi K3 xhigh and made Antigravity
-choose from a quality-first Claude, Gemini, and GPT ladder with quota fallback.
-v0.8.2 pinned the Codex reviewer; the current release uses Luna at max effort.
+Routing uses three tiers: T1 Claude and Codex review each other, T2 is the
+Pi chain (opencode-go DeepSeek V4.1 Flash, GLM 5.3, then Grok 4.7), and T3 is
+the Gemini Antigravity ladder as last resort. Reviewers get read-only tools.
+On host Claude, Codex-authored work is reviewed by the Claude main loop itself.
+Outside host Claude the Codex reviewer defaults to GPT-6 Astra medium; the
+architect selects high only for auth, sensitive data, migrations, concurrency,
+or changes spanning multiple modules. The Gemini ladder is `gemini-3.8-flash-high`,
+`gemini-3.7-flash-high`, then `gemini-3.1-pro-high`.
+
 
 ## Simplicity counterfactual
 
@@ -49,23 +43,18 @@ highest-value findings - the ones a single reviewer would miss.
 
 This plugin enforces that principle automatically:
 
-- Running in **Claude Code** -> external reviewer is **Codex** (`codex exec`,
-  `gpt-5.6-luna max` via ChatGPT subscription auth) for plans, with Grok first
-  for code/diff reviews
-- Running in **Codex** -> routing uses `ADVERSARIAL_REVIEW_AUTHOR`. Codex-authored
-  artifacts go to **Pi xAI OAuth Grok 4.5 xhigh** first. Grok-authored artifacts
-  go to **Codex Luna max** first, then Claude and a non-xAI Pi chain. If author is
-  omitted, plans infer `codex` and code/diffs infer `grok`
-- Running in **Grok** -> external reviewer is **Codex Luna max**, then
-  **Claude (Opus, xhigh)**, then a non-xAI Pi chain using DeepSeek then direct
-  Moonshot Kimi K3 xhigh, never Grok
-- Running in **Claude Code** plan review uses Codex, direct-xAI Grok, then the
-  Pi model chain. Code/diff review uses direct-xAI Grok, Codex, then the Pi
-  model chain (`xai-oauth/grok-4.5` with `--thinking xhigh`,
-  `opencode-go/deepseek-v4-flash:xhigh`, `moonshotai/kimi-k3:xhigh` direct API). Both paths
-  then use the quality-first Antigravity ladder (`agy -p "$prompt" --model ...`)
-- Everything unavailable -> **degraded mode** with explicit banner: the host
-  reviews itself, but the user is told the cross-host principle was bypassed
+- Running in **Claude Code** routes by author: Claude-authored work (default)
+  uses Astra high via Pi first; Codex-authored work is reviewed inline by the
+  Claude main loop, and the wrapper only adds T2/T3 opinions, never Codex.
+- Running in **Codex** with a Codex, user, or unknown author uses `claude -p`
+  first; Claude, Pi, or Grok authors use Codex Astra first. Then T2, then T3.
+- Running in **Grok** uses Codex Astra, then Gemini.
+- Codex Astra effort is medium by default. Set
+  `ADVERSARIAL_REVIEW_CODEX_EFFORT=high` only for auth, sensitive data,
+  migrations, concurrency, or changes spanning multiple modules.
+- Antigravity is a one-shot review call with `-p`, `--sandbox`, and `--mode plan`.
+- Everything unavailable enters **degraded mode** with an explicit banner.
+
 
 ## How it works
 
@@ -79,7 +68,7 @@ SKILL.md (same file in both hosts)
    │     ├─ ADVERSARIAL_REVIEW_DEPTH = 1  (anti-recursion guard)
    │     ├─ select ordered partners from host + artifact + author
    │     ├─ try Codex, Claude, direct xAI, or Pi in that route's order
-   │     ├─ on fail -> quality-first Antigravity ladder
+   │     ├─ on fail -> Gemini Antigravity ladder
    │     └─ on fail -> degraded mode (exit 2)
    │
    ├─ host runs its own independent analysis (no peeking at partner output)
@@ -94,7 +83,7 @@ The main session does the dispatch and synthesis directly.
 
 | Skill                                             | What it does                                                            |
 |---------------------------------------------------|--------------------------------------------------------------------------|
-| `/adversarial-review:adversarial-review`          | Single entry point. Classifies input (plan, code, prompt) and runs the matching procedure: plan critique with revised plan, red-team code review with patch, or prompt-engineering analysis (host-side, no external). |
+| `/adversarial-review:adversarial-review`          | Single entry point. Classifies input (plan, code, prompt) and runs the matching procedure: plan critique with revised plan, red-team code review with patch, or prompt-engineering analysis (external critique plus host adjudication). |
 
 In Codex, after running the install script, the same skills are available
 as `$<skill-name>` (Codex prompt-prefix convention).
@@ -135,14 +124,16 @@ to work (otherwise you'll get DEGRADED mode):
 # When host=claude, partner=codex:
 codex login
 
-# When host=codex and author=codex, partner=Pi xAI OAuth Grok 4.5 first:
+# When host=codex and author=codex, partner=Pi xAI OAuth Grok 4.7 first:
 pi --version
 
-# Host=codex fallback after Pi:
+# Host=codex direct fallback after Pi:
+grok --version
+
+# Next host=codex fallback:
 claude  # interactive once to register OAuth, then `claude -p` works headless
 
-# Optional fallback:
-grok --version
+# Optional final fallback:
 agy --version  # Antigravity CLI, authenticated through the Antigravity app
 ```
 
@@ -208,10 +199,9 @@ $adversarial-review review my changes: ...
 - `references/codex-integration.md` - Codex CLI specifics + `forced_login_method` gotcha
 - `references/claude-integration.md` - `claude -p --model opus --effort xhigh`
 - `references/pi-integration.md` - Pi model chain
-- `references/antigravity-integration.md` - quality-first Claude, Gemini, and GPT ladder through non-interactive Antigravity CLI
+- `references/antigravity-integration.md` - Gemini-only ladder through non-interactive Antigravity CLI
 - `references/fallback-chain.md` - external chain + Antigravity + degraded path
 - `AGENTS.md` - agent-side rules (severity, honesty, anti-recursion contract)
-- `CLAUDE.md` - Claude Code dev workflow
 
 ## License
 
