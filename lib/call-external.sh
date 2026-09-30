@@ -2,17 +2,15 @@
 # call-external.sh - call the OPPOSITE agent for adversarial review.
 #
 # Cross-host principle: "the partner reviews, never the host"
-#   host=claude -> artifact-dependent (user decision 2026-07-11):
-#     code/diff (default): grok first, then codex Luna max, then pi model chain.
-#       Rationale: the diff under review is normally Codex-authored, so Codex
-#       reviewing it would be same-family; Grok keeps the cross-family property.
-#     plan: codex Luna max first, then grok, then pi model chain.
-#       Rationale: plans are architect(Claude)-authored, so Codex IS the
-#       cross-family reviewer there.
-#   host=codex  -> author-aware: Codex-authored work goes to Grok; Grok-authored
-#                  work goes to Codex Luna max; unknown authors default to Luna
-#   host=grok   -> external=codex Luna max, then claude, then non-xAI pi model chain
-#   host=pi     -> external=codex Luna max, then claude, then grok (never pi itself)
+#   Tiers (user decision 2026-09-28): T1 Claude and Codex review each other;
+#   T2 Pi chain (opencode-go DeepSeek, GLM, then Grok); T3 Gemini (last resort).
+#   host=claude -> Claude-authored work (default): T1 Astra via Pi, then codex
+#                  exec. Codex-authored work: T1 is the host main loop itself, so
+#                  this script only supplies T2/T3 second opinions.
+#   host=codex  -> Codex/user/unknown-authored work: T1 claude -p. Claude, Pi or
+#                  Grok-authored work: T1 codex exec. Then T2, then T3.
+#   host=grok   -> external=codex Astra medium/high, then Gemini
+#   host=pi     -> external=codex Astra medium/high, then claude, then grok (never pi itself)
 #
 # Stdin:  the prompt to send to the external reviewer (multi-line OK)
 # Stdout: external reviewer's analysis in markdown
@@ -25,19 +23,21 @@
 # Env vars consumed:
 #   ADVERSARIAL_REVIEW_HOST          override host detection (passed to detect-host.sh)
 #   ADVERSARIAL_REVIEW_ARTIFACT      what is being reviewed: "code" (default) or "plan";
-#                                    affects partner order for host=claude and
-#                                    omitted-author inference for host=codex
-#   ADVERSARIAL_REVIEW_AUTHOR        artifact author for host=codex: codex, grok,
-#                                    claude, pi, user, or unknown; aliases sol,
-#                                    openai, xai, and anthropic are accepted
+#                                    used by host=codex author inference (always codex)
+#   ADVERSARIAL_REVIEW_AUTHOR        artifact author for host=claude (default claude)
+#                                    and host=codex: codex, grok, claude, pi, user, or
+#                                    unknown; aliases sol, openai, astra, xai, and
+#                                    anthropic are accepted
 #   ADVERSARIAL_REVIEW_DEPTH         anti-recursion counter; refuse if >= 1
 #   ADVERSARIAL_REVIEW_TIMEOUT       seconds; default 300
+#   ADVERSARIAL_REVIEW_CODEX_EFFORT  Codex reviewer effort: medium or high; default
+#                                    high on host=claude, medium elsewhere
 #   ADVERSARIAL_REVIEW_FORCE_DEGRADED  if "1", skip externals and go straight to degraded
 #                                      (for non-destructive smoke tests)
 #   ADVERSARIAL_REVIEW_GROK_MODELS     Comma-separated direct-xAI model chain;
-#                                      default grok-4.5
+#                                      default grok-4.7,grok-4.6
 #   ADVERSARIAL_REVIEW_GROK_MODEL      Back-compat single direct-xAI model override
-#   ADVERSARIAL_REVIEW_GROK_EFFORT     Grok CLI reasoning effort; default high
+#   ADVERSARIAL_REVIEW_GROK_EFFORT     Grok CLI reasoning effort; default xhigh
 #   ADVERSARIAL_REVIEW_PI_MODEL        Back-compat single Pi model id override
 #   ADVERSARIAL_REVIEW_PI_MODELS       Comma-separated Pi model chain
 #   ADVERSARIAL_REVIEW_PI_THINKING     Pi --thinking level for the first explicit model without a :level suffix; default xhigh
@@ -51,7 +51,16 @@ set -u
 LIB_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 TIMEOUT="${ADVERSARIAL_REVIEW_TIMEOUT:-300}"
 DEPTH="${ADVERSARIAL_REVIEW_DEPTH:-0}"
+CODEX_EFFORT="${ADVERSARIAL_REVIEW_CODEX_EFFORT:-medium}"
 LOG_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/adversarial-review"
+
+case "$CODEX_EFFORT" in
+  medium|high) ;;
+  *)
+    printf '[call-external] ERROR: ADVERSARIAL_REVIEW_CODEX_EFFORT must be medium or high, got: %s\n' "$CODEX_EFFORT" >&2
+    exit 1
+    ;;
+esac
 
 if ! mkdir -p "$LOG_DIR"; then
   printf '[call-external] ERROR: cannot create log directory: %s\n' "$LOG_DIR" >&2
@@ -73,7 +82,7 @@ normalize_author() {
   lower="$(printf '%s' "$raw" | tr '[:upper:]' '[:lower:]')"
   case "$lower" in
     "") printf '\n' ;;
-    codex|sol|openai) printf 'codex\n' ;;
+    codex|sol|openai|astra) printf 'codex\n' ;;
     grok|xai) printf 'grok\n' ;;
     claude|anthropic) printf 'claude\n' ;;
     pi|user|unknown) printf '%s\n' "$lower" ;;
@@ -91,9 +100,80 @@ run_with_timeout() {
     timeout "$secs" "$@"
   elif command -v gtimeout >/dev/null 2>&1; then
     gtimeout "$secs" "$@"
+  elif command -v python3 >/dev/null 2>&1; then
+    python3 -c '
+import math
+import os
+import signal
+import subprocess
+import sys
+import time
+
+try:
+    seconds = float(sys.argv[1])
+    if not math.isfinite(seconds) or seconds <= 0:
+        raise ValueError()
+except (ValueError, IndexError):
+    print("[call-external] ERROR: timeout must be positive and finite", file=sys.stderr)
+    sys.exit(125)
+
+child = None
+pending_signal = None
+
+class Interrupted(BaseException):
+    pass
+
+def interrupted(signum, frame):
+    global pending_signal
+    pending_signal = signum
+    if child is not None:
+        raise Interrupted(signum)
+
+def cleanup():
+    # Ignore repeat shutdown signals while terminating only our owned group.
+    signal.signal(signal.SIGTERM, signal.SIG_IGN)
+    signal.signal(signal.SIGINT, signal.SIG_IGN)
+    try:
+        os.killpg(child.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        pass
+    deadline = time.monotonic() + 1
+    try:
+        child.wait(timeout=1)
+    except subprocess.TimeoutExpired:
+        pass
+    time.sleep(max(0, deadline - time.monotonic()))
+    # The leader may have exited while descendants still ignore SIGTERM.
+    try:
+        os.killpg(child.pid, signal.SIGKILL)
+    except ProcessLookupError:
+        pass
+    child.wait()
+
+signal.signal(signal.SIGTERM, interrupted)
+signal.signal(signal.SIGINT, interrupted)
+try:
+    child = subprocess.Popen(sys.argv[2:], start_new_session=True)
+    if pending_signal is not None:
+        raise Interrupted(pending_signal)
+    try:
+        code = child.wait(timeout=seconds)
+    except subprocess.TimeoutExpired:
+        cleanup()
+        sys.exit(124)
+    sys.exit(code if code >= 0 else 128 - code)
+except (KeyboardInterrupt, Interrupted) as error:
+    if child is not None:
+        cleanup()
+    sys.exit(128 + (error.args[0] if isinstance(error, Interrupted) else signal.SIGINT))
+except FileNotFoundError:
+    sys.exit(127)
+except PermissionError:
+    sys.exit(126)
+' "$secs" "$@"
   else
-    log "WARN: timeout(1) not found; running without wall-clock cap"
-    "$@"
+    log "ERROR: timeout, gtimeout and python3 unavailable; refusing unbounded execution"
+    return 125
   fi
 }
 
@@ -115,12 +195,12 @@ run_and_emit_on_success() {
 }
 
 call_grok() {
-  local models_csv="${ADVERSARIAL_REVIEW_GROK_MODELS:-${ADVERSARIAL_REVIEW_GROK_MODEL:-grok-4.5}}"
+  local models_csv="${ADVERSARIAL_REVIEW_GROK_MODELS:-${ADVERSARIAL_REVIEW_GROK_MODEL:-grok-4.7,grok-4.6}}"
   local default_effort
   if [ "${ADVERSARIAL_REVIEW_GROK_EFFORT+x}" = "x" ]; then
     default_effort="$ADVERSARIAL_REVIEW_GROK_EFFORT"
   else
-    default_effort="high"
+    default_effort="xhigh"
   fi
   if ! command -v grok >/dev/null 2>&1; then
     return 1
@@ -175,13 +255,19 @@ call_pi() {
     return 1
   fi
 
-  local models_csv="${ADVERSARIAL_REVIEW_PI_MODELS:-${ADVERSARIAL_REVIEW_PI_MODEL:-xai-oauth/grok-4.5,opencode-go/deepseek-v4-flash:xhigh,moonshotai/kimi-k3:xhigh}}"
+  local models_csv="${ADVERSARIAL_REVIEW_PI_MODELS:-${ADVERSARIAL_REVIEW_PI_MODEL:-opencode-go/deepseek-v4.1-flash:xhigh,opencode-go/glm-5.3:high,xai-oauth/grok-4.7:high}}"
   local pi_thinking
   if [ "${ADVERSARIAL_REVIEW_PI_THINKING+x}" = "x" ]; then
     pi_thinking="$ADVERSARIAL_REVIEW_PI_THINKING"
   else
     pi_thinking="xhigh"
   fi
+  # Reviewer sees only the supplied prompt: skip skill listing, prompt
+  # templates, and AGENTS.md/CLAUDE.md context files. Extensions stay on
+  # (~100 tokens) so provider tweaks such as xAI priority tier still apply.
+  local lean=(--no-skills --no-prompt-templates --no-context-files)
+  # Read-only tools let the reviewer verify claims against the checkout.
+  local tools=(--tools read,grep,find,ls)
   local IFS=,
   local models
   read -r -a models <<< "$models_csv"
@@ -201,9 +287,9 @@ call_pi() {
     model_idx=$((model_idx + 1))
 
     if [ "$model" = "default" ] || [ "$model" = "pi-default" ] || [ "$model" = "__default__" ]; then
-      log "calling: pi -p --mode text --no-tools --no-session (configured default override, DEPTH=$((DEPTH+1)))"
+      log "calling: pi -p --mode text --tools read,grep,find,ls --no-session (configured default override, DEPTH=$((DEPTH+1)))"
       if run_and_emit_on_success run_with_timeout "$TIMEOUT" env ADVERSARIAL_REVIEW_DEPTH=$((DEPTH+1)) \
-        pi -p --mode text --no-tools --no-session "$prompt" \
+        pi -p --mode text "${tools[@]}" --no-session "${lean[@]}" "$prompt" \
         2>>"$LOG_DIR/pi.err" </dev/null; then
         return 0
       fi
@@ -213,25 +299,25 @@ call_pi() {
 
     case "$model" in
       *:off|*:minimal|*:low|*:medium|*:high|*:xhigh)
-        log "calling: pi -p --mode text --no-tools --no-session --model ${model} (DEPTH=$((DEPTH+1)))"
+        log "calling: pi -p --mode text --tools read,grep,find,ls --no-session --model ${model} (DEPTH=$((DEPTH+1)))"
         if run_and_emit_on_success run_with_timeout "$TIMEOUT" env ADVERSARIAL_REVIEW_DEPTH=$((DEPTH+1)) \
-          pi -p --mode text --no-tools --no-session --model "$model" "$prompt" \
+          pi -p --mode text "${tools[@]}" --no-session "${lean[@]}" --model "$model" "$prompt" \
           2>>"$LOG_DIR/pi.err" </dev/null; then
           return 0
         fi
         ;;
       *)
         if [ "$is_first_model" -eq 1 ] && [ -n "$pi_thinking" ]; then
-          log "calling: pi -p --mode text --no-tools --no-session --model ${model} --thinking ${pi_thinking} (DEPTH=$((DEPTH+1)))"
+          log "calling: pi -p --mode text --tools read,grep,find,ls --no-session --model ${model} --thinking ${pi_thinking} (DEPTH=$((DEPTH+1)))"
           if run_and_emit_on_success run_with_timeout "$TIMEOUT" env ADVERSARIAL_REVIEW_DEPTH=$((DEPTH+1)) \
-            pi -p --mode text --no-tools --no-session --model "$model" --thinking "$pi_thinking" "$prompt" \
+            pi -p --mode text "${tools[@]}" --no-session "${lean[@]}" --model "$model" --thinking "$pi_thinking" "$prompt" \
             2>>"$LOG_DIR/pi.err" </dev/null; then
             return 0
           fi
         else
-          log "calling: pi -p --mode text --no-tools --no-session --model ${model} (DEPTH=$((DEPTH+1)))"
+          log "calling: pi -p --mode text --tools read,grep,find,ls --no-session --model ${model} (DEPTH=$((DEPTH+1)))"
           if run_and_emit_on_success run_with_timeout "$TIMEOUT" env ADVERSARIAL_REVIEW_DEPTH=$((DEPTH+1)) \
-            pi -p --mode text --no-tools --no-session --model "$model" "$prompt" \
+            pi -p --mode text "${tools[@]}" --no-session "${lean[@]}" --model "$model" "$prompt" \
             2>>"$LOG_DIR/pi.err" </dev/null; then
             return 0
           fi
@@ -247,21 +333,13 @@ call_codex() {
   if ! command -v codex >/dev/null 2>&1; then
     return 1
   fi
-  log "calling: codex exec -m gpt-5.6-luna -c model_reasoning_effort=max --sandbox read-only (DEPTH=$((DEPTH+1)))"
+  log "calling: codex exec -m gpt-6-astra -c model_reasoning_effort=${CODEX_EFFORT} --sandbox read-only (DEPTH=$((DEPTH+1)))"
   run_and_emit_on_success run_with_timeout "$TIMEOUT" env ADVERSARIAL_REVIEW_DEPTH=$((DEPTH+1)) \
-    codex exec -m gpt-5.6-luna -c model_reasoning_effort=max --sandbox read-only --skip-git-repo-check "$prompt" \
+    codex exec -m gpt-6-astra -c model_reasoning_effort="$CODEX_EFFORT" --sandbox read-only --skip-git-repo-check "$prompt" \
     2>>"$LOG_DIR/codex.err" </dev/null
 }
 
-call_claude() {
-  if ! command -v claude >/dev/null 2>&1; then
-    return 1
-  fi
-  log "calling: claude -p --model opus --effort xhigh --bare --tools <none> (DEPTH=$((DEPTH+1)))"
-  run_and_emit_on_success run_with_timeout "$TIMEOUT" env ADVERSARIAL_REVIEW_DEPTH=$((DEPTH+1)) \
-    claude -p --model opus --effort xhigh --bare --tools "" --dangerously-skip-permissions "$prompt" \
-    2>>"$LOG_DIR/claude.err" </dev/null
-}
+source "$LIB_DIR/claude-reviewer.sh"
 
 find_antigravity_cmd() {
   if [ -n "${ADVERSARIAL_REVIEW_ANTIGRAVITY_CMD:-}" ]; then
@@ -287,7 +365,7 @@ call_antigravity() {
   local cmd
   cmd="$(find_antigravity_cmd)" || return 1
 
-  local models_csv="${ADVERSARIAL_REVIEW_ANTIGRAVITY_MODELS:-gemini-3.7-flash-high,claude-opus-4-6-thinking,gemini-3.1-pro-high,claude-sonnet-4-6,gpt-oss-120b-medium,gemini-3.6-flash-medium}"
+  local models_csv="${ADVERSARIAL_REVIEW_ANTIGRAVITY_MODELS:-gemini-3.8-flash-high,gemini-3.7-flash-high,gemini-3.1-pro-high}"
   local catalog=""
   local catalog_available=0
   if catalog="$(run_with_timeout "$TIMEOUT" "$cmd" models 2>>"$LOG_DIR/antigravity.err")"; then
@@ -311,9 +389,9 @@ call_antigravity() {
       continue
     fi
 
-    log "calling: ${cmd} -p <prompt> --model ${model} --sandbox (DEPTH=$((DEPTH+1)))"
+    log "calling: ${cmd} -p <prompt> --model ${model} --sandbox --mode plan (DEPTH=$((DEPTH+1)))"
     if run_and_emit_on_success run_with_timeout "$TIMEOUT" env ADVERSARIAL_REVIEW_DEPTH=$((DEPTH+1)) \
-      "$cmd" -p "$prompt" --print-timeout "${TIMEOUT}s" --model "$model" --sandbox \
+      "$cmd" -p "$prompt" --print-timeout "${TIMEOUT}s" --model "$model" --sandbox --mode plan \
       2>>"$LOG_DIR/antigravity.err" </dev/null; then
       return 0
     fi
@@ -350,78 +428,62 @@ if ! HOST="$(bash "$LIB_DIR/detect-host.sh")"; then
   HOST=unknown
 fi
 log "host=$HOST  depth=$DEPTH  timeout=${TIMEOUT}s"
+dispatch_explicit_reviewer
 
 # 5. Route to opposite partner
 case "$HOST" in
   claude)
-    ARTIFACT="${ADVERSARIAL_REVIEW_ARTIFACT:-code}"
-    if [ "$ARTIFACT" = "plan" ]; then
-      # Plan is architect(Claude)-authored: Codex is the cross-family reviewer.
-      log "artifact=plan - codex first, then grok"
-      if call_codex; then exit 0; fi
-      log "codex exec failed; trying grok"
-      if call_grok; then exit 0; fi
-      log "grok failed; trying pi"
-    else
-      # Code/diff is normally Codex-authored: Grok keeps the review cross-family.
-      log "artifact=${ARTIFACT} - grok first, then codex"
-      if call_grok; then exit 0; fi
-      log "grok failed; trying codex"
-      if call_codex; then exit 0; fi
-      log "codex exec failed; trying pi"
+    AUTHOR="$(normalize_author "${ADVERSARIAL_REVIEW_AUTHOR:-claude}")"
+    CODEX_EFFORT="${ADVERSARIAL_REVIEW_CODEX_EFFORT:-high}"
+    T2_MODELS="${ADVERSARIAL_REVIEW_PI_MODELS:-}"
+    if [ "$AUTHOR" = "grok" ] && [ -z "$T2_MODELS" ]; then
+      T2_MODELS="opencode-go/deepseek-v4.1-flash:xhigh,opencode-go/glm-5.3:high"
     fi
-    if call_pi; then exit 0; fi
-    log "pi failed; trying Antigravity model ladder"
+    if [ "$AUTHOR" = "codex" ]; then
+      log "author=codex - T1 is the host main loop; supplying T2, never codex"
+    else
+      log "author=${AUTHOR} - T1 Astra via pi, then codex exec"
+      if ADVERSARIAL_REVIEW_PI_MODELS="openai-codex/gpt-6-astra:${CODEX_EFFORT}" call_pi; then exit 0; fi
+      log "pi Astra failed; trying codex exec"
+      if call_codex; then exit 0; fi
+      log "codex exec failed; trying T2 pi chain"
+    fi
+    if ADVERSARIAL_REVIEW_PI_MODELS="$T2_MODELS" call_pi; then exit 0; fi
+    log "T2 pi chain failed; trying T3 Antigravity model ladder"
     ;;
   codex)
     ARTIFACT="${ADVERSARIAL_REVIEW_ARTIFACT:-code}"
     AUTHOR="$(normalize_author "${ADVERSARIAL_REVIEW_AUTHOR:-}")"
     if [ -z "$AUTHOR" ]; then
-      if [ "$ARTIFACT" = "plan" ]; then
-        AUTHOR=codex
-      else
-        AUTHOR=grok
-      fi
-      log "artifact=${ARTIFACT} author omitted; inferred author=${AUTHOR}"
+      # The default Codex interactive model is Astra, so omitted authors are Codex-owned.
+      AUTHOR=codex
+      log "artifact=${ARTIFACT} author omitted; inferred author=codex"
     else
       log "artifact=${ARTIFACT} author=${AUTHOR}"
     fi
 
     case "$AUTHOR" in
-      codex)
+      codex|user|unknown)
+        if ADVERSARIAL_REVIEW_CLAUDE_AUTH="${ADVERSARIAL_REVIEW_CLAUDE_AUTH:-subscription}" call_claude; then exit 0; fi
+        log "T1 claude -p failed; trying T2 pi chain"
         if call_pi; then exit 0; fi
-        log "pi failed; trying claude"
-        if call_claude; then exit 0; fi
-        log "claude -p failed; trying grok"
-        if call_grok; then exit 0; fi
-        log "grok failed; trying Antigravity model ladder"
+        ;;
+      claude|pi)
+        if call_codex; then exit 0; fi
+        log "T1 codex exec failed; trying T2 pi chain"
+        if call_pi; then exit 0; fi
         ;;
       grok)
         if call_codex; then exit 0; fi
-        log "codex exec failed; trying claude"
-        if call_claude; then exit 0; fi
-        log "claude -p failed; trying non-xAI pi chain"
-        if ADVERSARIAL_REVIEW_PI_MODELS="opencode-go/deepseek-v4-flash:xhigh,moonshotai/kimi-k3:xhigh" call_pi; then exit 0; fi
-        log "non-xAI pi chain failed; trying Antigravity model ladder"
-        ;;
-      *)
-        log "author=${AUTHOR} has no safe opposite-family inference; using Luna first"
-        if call_codex; then exit 0; fi
-        log "codex exec failed; trying claude"
-        if call_claude; then exit 0; fi
-        log "claude -p failed; trying non-xAI pi chain"
-        if ADVERSARIAL_REVIEW_PI_MODELS="opencode-go/deepseek-v4-flash:xhigh,moonshotai/kimi-k3:xhigh" call_pi; then exit 0; fi
-        log "non-xAI pi chain failed; trying Antigravity model ladder"
+        log "T1 codex exec failed; trying T2 non-xAI pi chain"
+        if ADVERSARIAL_REVIEW_PI_MODELS="opencode-go/deepseek-v4.1-flash:xhigh,opencode-go/glm-5.3:high" call_pi; then exit 0; fi
         ;;
     esac
+    log "T2 failed; trying T3 Antigravity Gemini ladder"
     ;;
   grok)
     if call_codex; then exit 0; fi
-    log "codex exec failed; trying claude"
-    if call_claude; then exit 0; fi
-    log "claude -p failed; trying non-xAI pi chain"
-    if ADVERSARIAL_REVIEW_PI_MODELS="opencode-go/deepseek-v4-flash:xhigh,moonshotai/kimi-k3:xhigh" call_pi; then exit 0; fi
-    log "non-xAI pi chain failed; trying Antigravity model ladder"
+    log "codex exec failed; trying Antigravity Gemini ladder"
     ;;
   pi)
     if call_codex; then exit 0; fi
@@ -440,7 +502,7 @@ case "$HOST" in
     ;;
 esac
 
-# 6. Quality-first Antigravity CLI ladder (fallback for both directions)
+# 6. Gemini Antigravity CLI ladder
 if call_antigravity; then
   exit 0
 fi
@@ -448,6 +510,7 @@ log "Antigravity model ladder unavailable or failed"
 
 # 7. Degraded mode - host-self analysis with explicit banner
 log "DEGRADED MODE - no external partner available; host will self-review"
+log "Before accepting DEGRADED, spawn a same-family subagent with clean context and read-only tools; label it EXTERNAL_SAME_FAMILY"
 printf '⚠️  DEGRADED MODE - Cross-host principle violated\n\n'
 printf 'No external partner (Codex / Claude / Grok / Pi / Antigravity) was reachable. '
 printf 'The host is reviewing its own work, which the principle forbids - '

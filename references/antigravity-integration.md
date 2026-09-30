@@ -1,20 +1,17 @@
 # Antigravity multi-provider integration
 
 `lib/call-external.sh` uses non-interactive Antigravity CLI as the final
-external fallback. It does not assume that Gemini is the only available
-provider and it never calls the standalone `gemini` CLI.
+external fallback. It uses the verified Gemini model IDs and never calls the standalone `gemini` CLI.
 
 ## Selection policy
 
 The script runs `agy models`, keeps only currently listed candidates, and
-tries this quality-first ladder:
+tries this ladder:
 
-1. `gemini-3.7-flash-high`
-2. `claude-opus-4-6-thinking`
+1. `gemini-3.8-flash-high`
+2. `gemini-3.7-flash-high`
 3. `gemini-3.1-pro-high`
-4. `claude-sonnet-4-6`
-5. `gpt-oss-120b-medium`
-6. `gemini-3.6-flash-medium`
+
 
 Availability has two gates:
 
@@ -27,14 +24,15 @@ stdout is emitted only on success.
 
 ## When Antigravity is used
 
-Antigravity is the final external fallback after the host-specific partner,
-direct xAI, and Pi model paths fail.
+Antigravity follows the primary route. For OpenAI-authored work after the two
+Grok transports fail, and for Grok-authored work or host Grok after Codex fails,
+it is the immediate fallback.
 
 | Detected host | Antigravity role |
 |---------------|------------------|
 | `claude` | Fallback after Codex, direct xAI, and Pi fail |
-| `codex` | Fallback after Pi, Claude, and direct xAI fail |
-| `grok` | Fallback after Codex, Claude, and Pi fail |
+| `codex` | Immediate after the applicable Grok or Codex primary route fails |
+| `grok` | Immediate after Codex fails |
 | `pi` | Fallback after Codex, Claude, and direct xAI fail |
 | `unknown` | Fallback after direct xAI and Pi fail |
 
@@ -50,20 +48,21 @@ agy \
   -p "$prompt" \
   --print-timeout "${ADVERSARIAL_REVIEW_TIMEOUT:-300}s" \
   --model "$model" \
-  --sandbox
+  --sandbox \
+  --mode plan
 ```
 
-`-p "$prompt"` makes the call non-interactive. Keep the prompt immediately
-after `-p`, because Antigravity parses the next token as the prompt. `--sandbox`
-keeps the fallback review-only. Model ids encode the intended reasoning tier, so the skill does
-not add one global `--effort` value across incompatible providers.
+`-p "$prompt"` makes the call a one-shot. Keep the prompt immediately after
+`-p`, because Antigravity parses the next token as the prompt. `--sandbox` and
+`--mode plan` together carry the review-only intent. Sandbox alone is not a
+read-only guarantee. Never use `-c` or continue. Model IDs encode effort.
 
 ## Env vars
 
 | Variable | Default | Effect |
 |----------|---------|--------|
 | `ADVERSARIAL_REVIEW_ANTIGRAVITY_CMD` | `agy` discovery | CLI command or absolute path |
-| `ADVERSARIAL_REVIEW_ANTIGRAVITY_MODELS` | quality-first ladder above | Comma-separated ordered model ids |
+| `ADVERSARIAL_REVIEW_ANTIGRAVITY_MODELS` | Gemini ladder above | Comma-separated ordered model ids |
 | `ADVERSARIAL_REVIEW_TIMEOUT` | `300` | Passed to both wrapper timeout and `--print-timeout` |
 
 ## Verification
