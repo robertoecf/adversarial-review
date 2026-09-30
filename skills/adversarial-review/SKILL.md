@@ -1,7 +1,7 @@
 ---
 name: adversarial-review
 description: "Use for requested adversarial review of plans, diffs, configs, prompts or skills, and whenever a project requires that gate."
-version: 0.9.8
+version: 0.9.9
 model: inherit
 allowed-tools: ["Read", "Grep", "Glob", "Bash"]
 triggers:
@@ -280,6 +280,23 @@ result. Preserve required repository/security/publication gates and host sandbox
 delegation rules. After fixes, review invalidated portions and affected invariants
 only unless a repository gate requires a full pass; no duplicate clean review.
 ```
+
+### Database evidence
+
+Reviewers never get database access: no SQL tool, no connection string, no
+network exception. When a claim depends on data (schema, migration state, row
+counts), the caller runs bounded read-only queries against a confirmed
+non-production target, inspects the output, and puts a sanitized summary in
+`{VERIFICATION_CONTEXT}`. Never paste PII or raw rows: the prompt reaches the
+reviewer's provider, including third-party gateways. With no confirmed safe
+target, review code and migrations only and say so. The reviewer may request a
+specific check; the caller decides whether to run it.
+
+Decision (2026-09-30): direct reviewer access is blocked until the target has
+its own credentials (not shared with production), its content is confirmed
+synthetic or sanitized, and the user authorizes that data flow to the
+providers. Even then, prefer predefined queries over minimal views with row,
+byte and time limits.
 
 Once classified for plan review, READ [the plan procedure](references/procedure-plan.md) before drafting the external prompt.
 

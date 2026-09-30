@@ -1,6 +1,6 @@
 # adversarial-review
 
-**v0.9.8**: Cross-host adversarial review for coding workflows. Works in
+**v0.9.9**: Cross-host adversarial review for coding workflows. Works in
 **Claude Code, Codex, Pi, and Grok** from the same source: detects which agent
 host you're running in and routes the heavy critique to the OTHER agent.
 
